@@ -56,7 +56,7 @@ class UniverseConstructor:
             for c in constituents
             if c["dateFirstAdded"]
         }
-
+        # load thme constituent changes and ticker changes
         constituent_changes = self._load_json("historical_constituents")
         ticker_changes = self._load_json("symbol_changes")
 
@@ -66,7 +66,7 @@ class UniverseConstructor:
             min(self._get_date(change["date"]) for change in constituent_changes),
             min(self._get_date(change["date"]) for change in ticker_changes),
         ):
-            # print(current_date)
+
             change_made = 0
             for change in constituent_changes:
                 if self._get_date(change["date"]) == current_date:

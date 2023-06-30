@@ -16,12 +16,28 @@ class DataFetcher:
         self.currdate = datetime.datetime.now().date()
 
     def _get_data(self, endpoint):
+        """
+        Helper function to get data from the API
+        params:
+            endpoint(str): endpoint to get data from
+        return:
+            data(dict): data from the API
+        """
         url = f"{self.base_url}{endpoint}{self.api_key}"
         response = requests.get(url)
         response.raise_for_status()
         return response.json()
 
     def _save_json(self, folder, filename, data):
+        """
+        Helper function to save data to a json file
+        params:
+            folder(str): folder to save the file in
+            filename(str): name of the file to save
+            data(dict): data to save to the file
+        return:
+            None
+        """
         if not os.path.exists(folder):
             os.makedirs(folder)
         filepath = os.path.join(folder, f"{filename}.json")
@@ -29,12 +45,23 @@ class DataFetcher:
             json.dump(data, f)
 
     def _load_json(self, filename):
+        """
+        Helper function to load data from a json file
+        params:
+            filename(str): name of the file to load
+        return:
+            data(dict): data loaded from the file
+        """
         filepath = os.path.join(self.storage_folder, f"{filename}.json")
         with open(filepath, "r") as f:
             data = json.load(f)
         return data
 
     def fetch_historical_constituents(self):
+        """
+        Fetch historical constituents data from the API
+        Sort the data by timestamp
+        """
         data = self._get_data("api/v3/historical/sp500_constituent?apikey=")
         data.sort(
             key=lambda x: datetime.datetime.strptime(x["date"], "%Y-%m-%d"),
@@ -49,6 +76,11 @@ class DataFetcher:
         print("Symbol Changes fetched successfully")
 
     def fetch_full_historical_price(self, symbol):
+        """
+        Fetch full historical price data for a given symbol
+        params:
+            symbol(str): symbol to fetch data for
+        """
         data = self._get_data(
             f"/api/v3/historical-price-full/{symbol}?from=1950-01-01&to={self.currdate}&apikey="
         )
@@ -71,6 +103,7 @@ class DataFetcher:
     def fetch_all_historical_prices(self):
         symbols = self.get_symbols_set()
         for symbol in symbols:
+            print(f"Fetching {symbol} pricing data")
             self.fetch_full_historical_price(symbol)
         print("Prcing data fetched successfully")
 

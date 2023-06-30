@@ -2,3 +2,4 @@
 RawDataStorage/
 DataExtracts/
 .DS_Store
+BackTest/backtest.json
