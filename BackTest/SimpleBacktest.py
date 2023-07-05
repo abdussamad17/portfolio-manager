@@ -16,10 +16,12 @@ class SimpleBacktest:
     def __init__(self):
         self.portfolio = {}
         self.portfolio_value_by_ticker = {}
+        self.last_seen_by_ticker = {}
+        self.n_day = 0
         self.portfolio_value = 0
         self.cash = 1000000
         self.date = datetime.date(1997, 6, 17)
-        self.end_date = datetime.date(1998, 6, 17)
+        self.end_date = datetime.date(2010, 6, 17)
         self.daily_returns = []
         self.equity_curve = []
         self.universe = None
@@ -60,11 +62,16 @@ class SimpleBacktest:
         prices = self._try_get_prices_by_date(self.date)
         if not prices:
             return
+
+        for x in prices:
+            self.last_seen_by_ticker[x['ticker']] = self.n_day
+        self.n_day += 1
         price_by_ticker = {x['ticker']: x for x in prices}
         #print(f'{price_by_ticker=}')
+        adj_universe = {x for x in self.universe if self.n_day - self.last_seen_by_ticker.get(x, 0) < 20}
 
 
-        dollar_weights = {ticker: 1/len(self.universe) for ticker in self.universe}
+        dollar_weights = {ticker: 1/len(adj_universe) for ticker in adj_universe}
         portfolio_values_by_ticker = {}
 
         uni_plus_holdings = set(self.universe).union(set([k for k, v in self.portfolio.items() if v > 0]))
@@ -92,15 +99,16 @@ class SimpleBacktest:
 
         turnover = 0
 
-        for ticker, tpos in target_positions.items():
-            delta_usd = tpos - portfolio_values_by_ticker[ticker]
-            pbt = price_by_ticker[ticker]
-            fill_price = pbt['vwap'] * pbt['adjClose'] / pbt['close']
-            delta_shares = delta_usd / fill_price
+        if self.date.weekday() == 3:
+            for ticker, tpos in target_positions.items():
+                delta_usd = tpos - portfolio_values_by_ticker[ticker]
+                pbt = price_by_ticker[ticker]
+                fill_price = pbt['vwap'] * pbt['adjClose'] / pbt['close']
+                delta_shares = delta_usd / fill_price
 
-            self.portfolio[ticker] = self.portfolio.get(ticker, 0) + delta_shares
-            self.cash -= delta_usd
-            turnover += abs(delta_shares)
+                self.portfolio[ticker] = self.portfolio.get(ticker, 0) + delta_shares
+                self.cash -= delta_usd
+                turnover += abs(delta_usd)
 
         #print(f'{self.portfolio=}')
 

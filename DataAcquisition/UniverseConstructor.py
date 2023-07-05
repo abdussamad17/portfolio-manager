@@ -66,7 +66,6 @@ class UniverseConstructor:
             min(self._get_date(change["date"]) for change in constituent_changes),
             min(self._get_date(change["date"]) for change in ticker_changes),
         ):
-
             change_made = 0
             for change in constituent_changes:
                 if self._get_date(change["date"]) == current_date:
@@ -120,6 +119,24 @@ class UniverseConstructor:
                             {"ticker": old_symbol, "date": current_date}
                         )
                         change_made = 1
+
+            # check if the datefirstadded in the constituents is the same as the current date. if the symbol appears in the universe, delete it
+            for change in constituents:
+                if change["symbol"] in universe and (
+                    self._get_date(change["dateFirstAdded"]) > current_date
+                ):
+                    # Delete the company's entry if it's removed from the S&P 500
+                    print(
+                        " deleting(Inception of Stock) "
+                        + change["symbol"]
+                        + " "
+                        + " on "
+                        + str(current_date)
+                        + " Size "
+                        + str(len(universe))
+                    )
+                    del universe[change["symbol"]]
+                    change_made = 1
 
             if change_made == 1:
                 self._save_json("universe" + str(current_date), universe)
