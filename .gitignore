@@ -3,3 +3,4 @@ RawDataStorage/
 DataExtracts/
 .DS_Store
 BackTest/backtest.json
+BackTest/VolatilityBacktest.json
