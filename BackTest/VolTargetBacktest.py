@@ -13,15 +13,24 @@ class VolTargetBacktest:
         self.portfolio_value = 0
         self.cash = 1000000
         self.date = datetime.date(1997, 6, 17)
-        self.end_date = datetime.date(2010, 6, 17)
+        self.end_date = datetime.date(2009, 6, 17)
         self.daily_returns = []
         self.equity_curve = []
         self.universe = None
         self.snapshots = []
         self.halflife = 20
         self.alpha = 1 - np.exp(np.log(0.5) / self.halflife) # decay factor for EMA
+        self.prev_close = {}
         self.returns = {} # stores the most recent return for each stock
         self.volatility = {} # stores the EMA of volatility for each stock
+
+        # SR comp
+        self.alpha_yearly = 1 - np.exp(np.log(0.5) / 256) # decay factor for EMA
+        self.ema_ret = 0
+        self.ema_vol = 0.02 ** 2
+
+        self.ret_all_time = 0
+        self.vol_all_time = 0
 
     def _try_get_universe_by_date(self, date):
         filepath = os.path.join(
@@ -70,17 +79,21 @@ class VolTargetBacktest:
             if ticker in price_by_ticker:
                 pbt = price_by_ticker[ticker]
                 adj_close = pbt['adjClose']
-                if ticker in self.returns:
-                    daily_return = adj_close / self.returns[ticker] - 1
+
+                if ticker in self.prev_close:
+                    daily_return = adj_close / self.prev_close[ticker] - 1
                     if ticker in self.volatility:
                         self.volatility[ticker] = (1 - self.alpha) * self.volatility[ticker] + self.alpha * daily_return**2
                     else:
-                        self.volatility[ticker] = daily_return**2
-                self.returns[ticker] = adj_close
+                        self.volatility[ticker] = 0.02**2
+                    self.returns[ticker] = daily_return
+                self.prev_close[ticker] = adj_close
+
 
         # Adjust dollar weights to be proportional to 1/volatility
         dollar_weights = {ticker: 1/np.sqrt(self.volatility.get(ticker, 1)) for ticker in adj_universe}
         total_weight = sum(dollar_weights.values())
+        print(f'{total_weight=}')
         dollar_weights = {ticker: weight/total_weight for ticker, weight in dollar_weights.items()}
 
         portfolio_values_by_ticker = {}
@@ -125,6 +138,14 @@ class VolTargetBacktest:
                 portfolio_values_by_ticker[ticker] = self.portfolio.get(ticker, 0) * pbt['adjClose']
 
         portfolio_value = sum(portfolio_values_by_ticker.values()) + self.cash
+        if self.snapshots:
+            past_pv = self.snapshots[-1]['pv']
+            if past_pv:
+                port_return = (portfolio_value - past_pv)/past_pv
+                self.ema_ret = (1 - self.alpha_yearly) * self.ema_ret + self.alpha_yearly * port_return
+                self.ema_vol = (1 - self.alpha_yearly) * self.ema_vol + self.alpha_yearly * port_return**2
+
+
         snap = {
             'date': self.date.strftime('%Y-%m-%d'),
             'pv': portfolio_value,
@@ -132,14 +153,14 @@ class VolTargetBacktest:
             'turnover': turnover,
             'cost': cost,
             'n_stocks': len([x for x in self.portfolio.values() if x > 0]),
+            'roll_ret': self.ema_ret * 256 * 100,
+            'roll_sigma': self.ema_vol**0.5 * 16 * 100,
+            'roll_sr': self.ema_ret/self.ema_vol**0.5 * 16,
             'portfolio': dict(self.portfolio),
         }
         self.snapshots.append(snap)
-        print(self.date, self.universe_date)
-        print([k for k in self.universe if k not in price_by_ticker])
-
-
-
+        #print(self.date, self.universe_date)
+        #print([k for k in self.universe if k not in price_by_ticker])
 
 
 
@@ -149,7 +170,7 @@ class VolTargetBacktest:
             self._run_day()
             self.date += datetime.timedelta(days=1)
 
-        with open(f'backtest.json', "w") as fo:
+        with open(f'VolatilityBacktest.json', "w") as fo:
             for snap in self.snapshots:
                 json.dump(snap, fo)
                 fo.write("\n")
