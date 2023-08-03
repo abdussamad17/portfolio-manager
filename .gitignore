@@ -4,3 +4,9 @@ DataExtracts/
 .DS_Store
 BackTest/backtest.json
 BackTest/VolatilityBacktest.json
+BackTest/*.pkl
+BackTest/*.json
+Backtest/aaa/*.pkl
+Backtest/aaa/*.json
+classes_Portfolio_manager.dot
+BackTest/inputs.npz

@@ -4,7 +4,12 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+import sys
+import pickle
 
+from HRPStrategy import HRPStrategy
+from XGBStrategy import XGBStrategy
+from CNNStrategy import CNNStrategy
 
 
 class EqualVolStrategy:
@@ -116,9 +121,9 @@ class MarkowitzStrategy:
         if num_assets == 0:
             return {ticker: 0 for ticker in adj_universe}
 
-        return_vector = np.full(cov_matrix.shape[0], self.return_estimate)
+        return_vector = np.full(cov_matrix.shape[0], self._return_estimate)
 
-        if self.vol_weighted:
+        if self._vol_weighted:
             vols = np.diag(cov_matrix)**0.5
             return_vector *= vols/vols.mean()
 
@@ -129,7 +134,7 @@ class MarkowitzStrategy:
         bounds = [(0, self._max_concentration) for _ in range(num_assets)]
         constraints = ({'type': 'eq', 'fun': lambda weights: np.sum(weights) - 1})
 
-        result = minimize(self.objective_function, initial_weights, args=(cov_matrix,),
+        result = minimize(self.objective_function, initial_weights, args=(return_vector, cov_matrix,),
                           bounds=bounds, constraints=constraints)
 
         # Map optimal weights to tickers
@@ -201,10 +206,66 @@ class EqualVolContributionStrategy:
         optimal_weights = {ticker: weight for ticker, weight in zip(adj_universe, result.x)}
         return optimal_weights
 
+class PriceHistory:
+    def __init__(self):
+        self._fix_id_by_ticker = {}
+        self._date_id_by_date = {}
+        self._fix_adj_close_by_date = {}
+        self._fix_adj_open_by_date = {}
+        self._fix_adj_high_by_date = {}
+        self._fix_adj_low_by_date = {}
+        self._fix_vol_by_date = {}
+
+    def add_prices(self, date, prices_by_ticker):
+        if date not in self._date_id_by_date:
+            self._date_id_by_date[date] = len(self._date_id_by_date)
+        date_id = self._date_id_by_date[date]
+
+        for ticker in prices_by_ticker:
+            if ticker not in self._fix_id_by_ticker:
+                self._fix_id_by_ticker[ticker] = len(self._fix_id_by_ticker)
+            fix_id = self._fix_id_by_ticker[ticker]
+
+        fix_adj_close = np.full(len(self._fix_id_by_ticker), np.nan)
+        fix_adj_open = np.full(len(self._fix_id_by_ticker), np.nan)
+        fix_adj_high = np.full(len(self._fix_id_by_ticker), np.nan)
+        fix_adj_low = np.full(len(self._fix_id_by_ticker), np.nan)
+        fix_vol = np.full(len(self._fix_id_by_ticker), np.nan)
+
+        for ticker, price in prices_by_ticker.items():
+            adjFactor = price['adjClose']/price['close']
+            fix_adj_close[self._fix_id_by_ticker[ticker]] = price['adjClose']
+            fix_adj_open[self._fix_id_by_ticker[ticker]] = price['open'] * adjFactor
+            fix_adj_high[self._fix_id_by_ticker[ticker]] = price['high'] * adjFactor
+            fix_adj_low[self._fix_id_by_ticker[ticker]] = price['low'] * adjFactor
+            fix_vol[self._fix_id_by_ticker[ticker]] = price['volume']
+
+        self._fix_adj_close_by_date[date_id] = fix_adj_close
+        self._fix_adj_open_by_date[date_id] = fix_adj_open
+        self._fix_adj_high_by_date[date_id] = fix_adj_high
+        self._fix_adj_low_by_date[date_id] = fix_adj_low
+        self._fix_vol_by_date[date_id] = fix_vol
+
+    def get_price_matrix(self, type='adj_close'):
+        map_by_type = {
+            'adj_close': self._fix_adj_close_by_date,
+            'adj_open': self._fix_adj_open_by_date,
+            'adj_high': self._fix_adj_high_by_date,
+            'adj_low': self._fix_adj_low_by_date,
+            'vol': self._fix_vol_by_date
+        }
+
+        source = map_by_type[type]
+        output = np.full((len(self._date_id_by_date), len(self._fix_id_by_ticker)), np.nan)
+        for date_id, fix_prices in source.items():
+            output[date_id, :fix_prices.shape[0]] = fix_prices
+        return output
+
 
 class Backtester:
     def __init__(self, strategy, max_position_pct=0.05):
         self.strategy = strategy
+        self.strategy_name = None
 
         self.portfolio = {}
         self.portfolio_value_by_ticker = {}
@@ -233,6 +294,7 @@ class Backtester:
 
         self.ret_all_time = 0
         self.vol_all_time = 0
+        self.price_history = PriceHistory()
 
     def _try_get_universe_by_date(self, date):
         filepath = os.path.join(
@@ -267,7 +329,10 @@ class Backtester:
         n = len(sorted_values)
 
         # Compute the Lorenz curve's cumulative sum
-        lorenz_curve = np.cumsum(sorted_values) / np.sum(sorted_values)
+        value_sum = np.sum(sorted_values)
+        if value_sum < 1e-6:
+            return 0
+        lorenz_curve = np.cumsum(sorted_values) / value_sum
 
         # Compute the Gini coefficient
         gini = 1 - 2 * np.mean(lorenz_curve)
@@ -296,7 +361,7 @@ class Backtester:
                 self.volatility[ticker] = 0.02**2
 
         dollar_weights = self.strategy.get_dollar_weights(self, adj_universe, price_by_ticker)
-
+        self.price_history.add_prices(self.date, price_by_ticker)
         ## Enforce the maximum position constraint
         #total_weight = sum(dollar_weights.values())
         #for ticker, weight in dollar_weights.items():
@@ -389,6 +454,9 @@ class Backtester:
         #print(self.date, self.universe_date)
         #print([k for k in self.universe if k not in price_by_ticker])
 
+
+
+
         if ((self.last_year is not None) and (self.date.year != self.last_year)) or (self.date == self.end_date):
             cagr, sharpe_ratio, volatility = self.compute_statistics(self.snapshots)
             print(self.date)
@@ -427,43 +495,35 @@ class Backtester:
 
         return cagr, sharpe_ratio, volatility
 
-
-
     @staticmethod
-    def compare_equity_curves(backtesters, labels):
-        """
-        Compare the equity curves of multiple backtest strategies on the same plot.
+    def get_save_name(strategy_name):
+        numberless = f"{strategy_name}.pkl"
+        if not os.path.isfile(numberless):
+            return strategy_name
 
-        Parameters:
-        - backtesters (list): List of Backtester objects.
-        - labels (list): Names/labels of the strategies for legend.
-        """
-        plt.figure(figsize=(12, 6))
+        for i in range(1, 99999):
+            test_name = f"{strategy_name}_{i}.pkl"
+            if not os.path.isfile(test_name):
+                return f"{strategy_name}_{i}"
 
-        for bt, label in zip(backtesters, labels):
-            dates = [datetime.datetime.strptime(snap['date'], '%Y-%m-%d') for snap in bt.snapshots]
-            portfolio_values = [snap['pv'] for snap in bt.snapshots]
-            plt.plot(dates, portfolio_values, label=label, linewidth=2)
+        assert False
 
-        plt.title("Equity Curve Comparison")
-        plt.xlabel('Date')
-        plt.ylabel('Portfolio Value')
-        plt.grid(True)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
+    def run(self, strategy_name):
+        self.strategy_name = strategy_name
 
-
-
-    def run(self, strategy):
         while self.date <= self.end_date:
             self._run_day()
             self.date += datetime.timedelta(days=1)
 
-        with open(f'{strategy}.json', "w") as fo:
+        save_name = self.get_save_name(strategy_name)
+
+        with open(f'{save_name}.json', "w") as fo:
             for snap in self.snapshots:
                 json.dump(snap, fo)
                 fo.write("\n")
+
+        with open(f'{save_name}.pkl' , "wb") as x:
+            pickle.dump(self, x)
 
 
     def _get_price(self, ticker, date):
@@ -493,21 +553,37 @@ if __name__ == '__main__':
     #print(bt._try_get_universe_by_date(bt.date + datetime.timedelta(days=1)))
     #bt.run()
 
-    #bt3 = Backtester(EqualVolContributionStrategy())
-    #bt3.run("EqualVolContributionStrategy")
 
-    bt1 = Backtester(EqualDollarStrategy())
-    bt1.run("EqualDollarStrategy")
+    strategy_by_name= {
+        "EqualDollarStrategy": EqualDollarStrategy,
+        "EqualVolStrategy": EqualVolStrategy,
+        "MinimumVarianceStrategy": MinimumVarianceStrategy,
+        "EqualVolContributionStrategy": EqualVolContributionStrategy,
+        "MarkowitzStrategy": MarkowitzStrategy,
+        "HRPStrategy": HRPStrategy,
+        "XGBStrategy": XGBStrategy,
+        "CNNStrategy": CNNStrategy
+    }
 
-    bt2 = Backtester(EqualVolStrategy())
-    bt2.run("EqualVolStrategy")
+    #list of strats
+    strat_name = sys.argv[1]
+    sp = strat_name.split(',')
+    print(sp)
+    params = {}
+    for param in sp[1:]:
+        print(param)
+        k, v = param.split('=')
+        params[k] = v
 
-    bt4 = Backtester(MinimumVarianceStrategy())
-    bt4.run("MinimumVarianceStrategy")
+    if sp[0] == 'MarkowitzStrategy':
+        params['risk_constant'] = float(params['risk_constant'])
+        params['return_estimate'] = float(params['return_estimate'])
+        params['vol_weighted'] = bool(params['vol_weighted'])
+        params['max_concentration'] = bool(params['max_concentration'])
 
-    bt5 = Backtesteer(MarkowitzStrategy())
-    bt5.run("MarkowitzStrategy")
+    strat_class = strategy_by_name[sp[0]]
 
-    Backtester.compare_equity_curves([bt5,bt4,bt1,bt2], ["MarkowitzStrategy","MinimumVarianceStrategy","EqualDollarStrategy","EqualVolStrategy"])
+    bt = Backtester(strat_class(**params))
+    bt.run(strat_name)
 
 
