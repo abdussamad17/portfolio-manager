@@ -67,10 +67,20 @@ class CNNStrategy:
 
         for start_date_idx in range(0, idx_now - data_window):
             for stock_idx in range(0, price_matrix.shape[1]):
-                if np.isnan(price_matrix[start_date_idx:start_date_idx+data_window, stock_idx]).any():
-                    continue
 
-                n_datapoints += 1
+                is_ok = True
+                for t in input_types:
+                    submatrix = price_matrix_by_type[t]
+                    if np.isnan(submatrix[start_date_idx:start_date_idx+data_window, stock_idx]).any():
+                        is_ok = False
+                        break
+
+                    if t == 'vol':
+                        if submatrix[start_date_idx:start_date_idx+input_window, stock_idx].sum() < 1:
+                            is_ok = False
+                            break
+                if is_ok:
+                    n_datapoints += 1
 
         X = np.zeros((n_datapoints, input_window, len(input_types) + 1))
         ema_idx = len(input_types)
@@ -87,19 +97,34 @@ class CNNStrategy:
                     else:
                         adj_close_ema = (1 - ema_const) * adj_close_ema + ema_const * price_matrix[start_date_idx, stock_idx]
 
-                if np.isnan(price_matrix[start_date_idx:start_date_idx+data_window, stock_idx]).any():
-                    continue
+                is_ok = True
 
                 for d, t in enumerate(input_types):
                     submatrix = price_matrix_by_type[t]
+                    if np.isnan(price_matrix[start_date_idx:start_date_idx+data_window, stock_idx]).any():
+                        is_ok = False
+                        break
+
                     price_series = submatrix[start_date_idx:start_date_idx+data_window, stock_idx]
                     X[i, :, d] = price_series[:input_window]
+
+                    if t == 'vol':
+                        if X[i, :, d].sum() < 1:
+                            is_ok = False
+                            break
+
+                if not is_ok:
+                    continue
+
                 X[i, 0, ema_idx] = adj_close_ema
                 for t in range(1, X.shape[1]):
                     X[i, t, ema_idx] = (1 - ema_const) * X[i, t-1, ema_idx] + ema_const * X[i, t, 0]
 
-                y[i] = price_series[-1]/price_series[input_window+1] - 1.0
+                close_matrix = price_matrix_by_type['adj_close']
+                price_series = close_matrix[start_date_idx:start_date_idx+data_window, stock_idx]
+                y[i] = price_series[-1]/X[i, -1, 0] - 1.0
                 i += 1
+        assert i == n_datapoints
 
         np.savez('inputs.npz', X, y)
 

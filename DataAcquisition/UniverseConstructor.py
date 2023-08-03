@@ -1,3 +1,4 @@
+import collections
 import os
 import json
 import datetime
@@ -62,63 +63,72 @@ class UniverseConstructor:
 
         current_date = datetime.datetime.now().date()
 
+        constituent_changes_by_date = collections.defaultdict(list)
+        ticker_changes_by_date = collections.defaultdict(list)
+
+        for change in constituent_changes:
+            constituent_changes_by_date[self._get_date(change["date"])].append(change)
+
+        for change in ticker_changes:
+            ticker_changes_by_date[self._get_date(change["date"])].append(change)
+
+
         while current_date >= min(
             min(self._get_date(change["date"]) for change in constituent_changes),
             min(self._get_date(change["date"]) for change in ticker_changes),
         ):
             change_made = 0
-            for change in constituent_changes:
-                if self._get_date(change["date"]) == current_date:
-                    if change["addedSecurity"]:
-                        if change["symbol"] in universe:
-                            # Delete the company's entry if it's removed from the S&P 500
-                            print(
-                                "deleting"
-                                + change["symbol"]
-                                + " "
-                                + " on "
-                                + str(current_date)
-                                + " Size "
-                                + str(len(universe))
-                            )
-                            del universe[change["symbol"]]
-                            change_made = 1
-
-                    elif change["removedSecurity"]:
-                        if change["symbol"] not in universe:
-                            # Add a new entry for the company when it's added to the S&P 500
-                            print(
-                                "Adding"
-                                + change["symbol"]
-                                + " "
-                                + " on "
-                                + str(current_date)
-                                + " Size "
-                                + str(len(universe))
-                            )
-                            universe[change["symbol"]] = [
-                                {"ticker": change["symbol"], "date": str(current_date)}
-                            ]
-                            change_made = 1
-            for change in ticker_changes:
-                if self._get_date(change["date"]) == current_date:
-                    old_symbol = change["oldSymbol"]
-                    new_symbol = change["newSymbol"]
-
-                    if new_symbol in universe.keys():
-                        # Add the new ticker to the company's list of tickers
+            for change in constituent_changes_by_date[current_date]:
+                if change["addedSecurity"]:
+                    if change["symbol"] in universe:
+                        # Delete the company's entry if it's removed from the S&P 500
                         print(
-                            "symbol change from:"
-                            + new_symbol
-                            + " to "
-                            + old_symbol
-                            + " on  "
+                            "deleting"
+                            + change["symbol"]
+                            + " "
+                            + " on "
                             + str(current_date)
+                            + " Size "
+                            + str(len(universe))
                         )
-                        universe[new_symbol].append(
-                            {"ticker": old_symbol, "date": current_date}
-                        )
+                        del universe[change["symbol"]]
                         change_made = 1
+
+                elif change["removedSecurity"]:
+                    if change["symbol"] not in universe:
+                        # Add a new entry for the company when it's added to the S&P 500
+                        print(
+                            "Adding"
+                            + change["symbol"]
+                            + " "
+                            + " on "
+                            + str(current_date)
+                            + " Size "
+                            + str(len(universe))
+                        )
+                        universe[change["symbol"]] = [
+                            {"ticker": change["symbol"], "date": str(current_date)}
+                        ]
+                        change_made = 1
+
+            for change in ticker_changes_by_date[current_date]:
+                old_symbol = change["oldSymbol"]
+                new_symbol = change["newSymbol"]
+
+                if new_symbol in universe.keys():
+                    # Add the new ticker to the company's list of tickers
+                    print(
+                        "symbol change from:"
+                        + new_symbol
+                        + " to "
+                        + old_symbol
+                        + " on  "
+                        + str(current_date)
+                    )
+                    universe[new_symbol].append(
+                        {"ticker": old_symbol, "date": current_date}
+                    )
+                    change_made = 1
 
             # check if the datefirstadded in the constituents is the same as the current date. if the symbol appears in the universe, delete it
             for change in constituents:
