@@ -297,8 +297,12 @@ class Backtester:
         self.price_history = PriceHistory()
 
     def _try_get_universe_by_date(self, date):
+        storage_folder = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)), "..", "RawDataStorage"
+        )
         filepath = os.path.join(
-            '/Users/abdussamad/Documents/Github repos/portfolio-manager/RawDataStorage/UniversebyDate',
+            storage_folder,
+            'UniversebyDate',
             f'universe{date.strftime("%Y-%m-%d")}.json'
         )
         if not os.path.exists(filepath):
@@ -307,8 +311,11 @@ class Backtester:
             return json.load(f)
 
     def _try_get_prices_by_date(self, date):
+        storage_folder = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)), "..", "DataExtracts"
+        )
         filepath = os.path.join(
-            '/Users/abdussamad/Documents/Github repos/portfolio-manager/DataExtracts',
+            storage_folder,
             f'daily_{date.strftime("%Y-%m-%d")}.json'
         )
 

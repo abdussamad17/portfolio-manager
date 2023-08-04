@@ -1,7 +1,9 @@
 numpy==1.21.0
 pandas==1.2.5
 requests==2.25.1
-json
 datetime
 scipy
 matplotlib
+torch
+python-dotenv
+python-dateutil

@@ -1,6 +1,103 @@
 import numpy as np
 import torch
 
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+BATCH_SIZE = 128
+LEARNING_RATE = 1e-4
+NUM_EPOCHS = 3
+
+
+def bresenham(img, x0, y0, x1, y1):
+    dx = abs(x1 - x0)
+    sx = 1 if x0 < x1 else -1
+    dy = -abs(y1 - y0)
+    sy = 1 if y0 < y1 else -1
+    error = dx + dy
+
+    while True:
+        img[x0, y0] = 255
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = 2 * error
+        if e2 >= dy:
+            if x0 == x1:
+                break
+            error += dy
+            x0 += sx
+        if e2 <= dx:
+            if y0 == y1:
+                break
+            error += dx
+            y0 += sy
+
+def make_image(sample, ema=True, volume=True):
+    height_bars = 96
+    width = sample.shape[0] * 3
+    img_ohlc = np.zeros((width, height_bars), dtype=np.uint8)
+
+    max_price = max(sample[:, :4].max(), sample[:, 5].max())
+    min_price = min(sample[:, :4].min(), sample[:, 5].min())
+    height_scaler = (height_bars - 1) / (max_price - min_price)
+
+    ema_y_prev = None
+
+    for t in range(sample.shape[0]):
+        open_y = round((sample[t, 1] - min_price) * height_scaler)
+        img_ohlc[3*t, open_y] = 255
+        close_y = round((sample[t, 0] - min_price) * height_scaler)
+        img_ohlc[3*t+2, close_y] = 255
+
+        low_y = round((sample[t, 3] - min_price) * height_scaler)
+        high_y = round((sample[t, 2] - min_price) * height_scaler)
+        img_ohlc[3*t+1, low_y:high_y] = 255
+
+        if ema:
+            ema_y = round((sample[t, 5] - min_price) * height_scaler)
+            img_ohlc[3*t+1, ema_y] = 255
+            if ema_y_prev is not None:
+                bresenham(img_ohlc, 3*t-2, ema_y_prev, 3*t+1, ema_y)
+            ema_y_prev = ema_y
+
+    if not volume:
+        return img_ohlc.T
+
+    height_vol = 24
+    height_whole = height_bars + height_vol if volume else 0
+    img_whole = np.zeros((width, height_whole), dtype=np.uint8)
+    img_whole[:, :height_bars] = img_ohlc
+
+    max_vol = sample[:, 4].max()
+    vol_scaler = (height_vol - 1)/max_vol
+    for t in range(sample.shape[0]):
+        vol_y = round(sample[t, 4] * vol_scaler)
+        img_whole[3*t+1, height_whole-vol_y-1:height_whole-1] = 255
+
+    return img_whole.T
+
+class StockCNN(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.block1 = torch.nn.Sequential(
+            torch.nn.Conv2d(1, 64, kernel_size=(5, 3), padding=1),
+            torch.nn.LeakyReLU(negative_slope=0.01, inplace=True),
+            torch.nn.MaxPool2d((2, 1))
+        )
+        self.block2 = torch.nn.Sequential(
+            torch.nn.Conv2d(64, 128, kernel_size=(5, 3), padding=1),
+            torch.nn.LeakyReLU(negative_slope=0.01, inplace=True),
+            torch.nn.MaxPool2d((2, 1))
+        )
+        self.out_block = torch.nn.Sequential(
+            torch.nn.Flatten(),
+            torch.nn.Linear(161280, 2),
+            torch.nn.Softmax(dim=-1))
+
+    def forward(self, x):
+        x = self.block1(x)
+        x = self.block2(x)
+        x = self.out_block(x)
+        return x
+
 class CNNStrategy:
     def __init__(self, retrain_every=252):
         self._retrain_every = retrain_every
@@ -13,47 +110,85 @@ class CNNStrategy:
         if not self._trained:
             return {ticker: 0 for ticker in adj_universe}
         else:
-            preds = self.infer(adj_universe, backtester.price_history)
-            pos_weights = set(k for k, v in preds.items() if v > 0.01)
-            print(len(adj_universe), len(pos_weights))
-            if not pos_weights:
-                return {ticker: 0 for ticker in adj_universe}
-            return {ticker: 1/len(pos_weights) if ticker in pos_weights else 0 for ticker in adj_universe}
+            return self.infer(adj_universe, backtester.price_history)
 
     def infer(self, adj_universe, price_history):
-        price_matrix = price_history.get_price_matrix()
+        Xs, fix_id_by_adj_universe = self._extract_data_for_inference(price_history, adj_universe)
+        scales = Xs[:, 0, 1].reshape(-1, 1, 1).copy()
+        Xs[:, :, [5]] /= scales
+        Xs[:, :, :4] /= scales
 
-        idx_now = price_matrix.shape[0] - 1
-        prediction_horizon = 5
-        input_window = 15 + 1
-        data_window = prediction_horizon + input_window + 1
+        xs_pt = torch.zeros(size=(Xs.shape[0], 120, 45), dtype=torch.uint8)
+        for i in range(Xs.shape[0]):
+            xs_pt[i] = torch.tensor(make_image(Xs[i]))
 
-        fix_id_by_adj_universe = {t: price_history._fix_id_by_ticker[t] for t in adj_universe if t in price_history._fix_id_by_ticker}
-        fix_id_by_adj_universe = {k: v for k, v in fix_id_by_adj_universe.items() if not
-            np.isnan(price_matrix[-input_window:, v]).any()}
-        X_pred = np.zeros((len(fix_id_by_adj_universe), input_window - 1))
+        with torch.inference_mode():
+            y_hats = self._model(xs_pt).cpu().numpy()
 
+        y_argmaxes = np.argmax(y_hats, dim=-1)
+        n_pos = y_argmaxes.sum()
+
+        out = {}
         for i, (t, v) in enumerate(fix_id_by_adj_universe.items()):
-            price_series = price_matrix[-input_window:, v]
-            X_pred[i, :] = price_series[1:input_window]/price_series[0:input_window-1] - 1.0
-
-        y_pred = self._model.predict(xgb.DMatrix(X_pred))
-
-        # print(y_pred)
-        out = {t: y_pred[i] for i, t in enumerate(fix_id_by_adj_universe)}
+            out[t] = 1/n_pos if y_argmaxes[i] > 0 else 0
         for t in adj_universe:
             if not t in out:
                 out[t] = 0
         return out
 
-    def train(self, price_history):
+    def _extract_data_for_inference(self, price_history, adj_universe):
         input_types =  [
-            'adj_close',
-            'adj_open',
-            'adj_high',
-            'adj_low',
-            'vol',
-        ]
+                    'adj_close',
+                    'adj_open',
+                    'adj_high',
+                    'adj_low',
+                    'vol',
+                ]
+        price_matrix_by_type = {k: price_history.get_price_matrix(k) for k in input_types}
+        input_window = 15
+        ema_input_window = 40
+        total_input_window = input_window + ema_input_window + 1
+        ema_const = 1 - np.exp(np.log(0.5) / 7.5)
+
+        fix_id_by_adj_universe = {t: price_history._fix_id_by_ticker[t] for t in adj_universe if t in price_history._fix_id_by_ticker}
+        fix_id_by_adj_universe2 = {}
+        for k, v in fix_id_by_adj_universe.items():
+            is_good = True
+            for t in input_types:
+                price_matrix = price_matrix_by_type[t]
+                if np.isnan(price_matrix[-total_input_window:, v]).any():
+                    is_good = False
+                    break
+                if t == 'vol':
+                    if price_matrix[-(input_window + 1):, v].sum() < 1:
+                        is_good = False
+            if is_good:
+                fix_id_by_adj_universe2[k] = v
+        fix_id_by_adj_universe = fix_id_by_adj_universe2
+
+        X_pred = np.zeros((len(fix_id_by_adj_universe), input_window, len(input_types) + 1))
+
+        for i, (t, v) in enumerate(fix_id_by_adj_universe.items()):
+            adj_close = price_matrix_by_type['adj_close'][-total_input_window:, v]
+            adj_close_ema = np.array(adj_close)
+            for j in range(1, len(adj_close_ema)):
+                adj_close_ema[j] = (1 - ema_const) * adj_close_ema[j-1] + ema_const * adj_close_ema[j]
+
+            for j, t in input_types:
+                price_series = price_matrix_by_type[t][-input_window:, v]
+                X_pred[i, :, j] = price_series
+            X_pred[i, :, -1] = adj_close_ema
+
+        return X_pred, fix_id_by_adj_universe
+
+    def _extract_data(self, price_history):
+        input_types =  [
+                    'adj_close',
+                    'adj_open',
+                    'adj_high',
+                    'adj_low',
+                    'vol',
+                ]
         price_matrix_by_type = {k: price_history.get_price_matrix(k) for k in input_types}
         price_matrix = price_matrix_by_type['adj_close']
 
@@ -128,8 +263,48 @@ class CNNStrategy:
 
         np.savez('inputs.npz', X, y)
 
-        # dtrain = xgb.DMatrix(X, label=y)
-        # self._model = xgb.train({}, dtrain, num_boost_round=100)
-        # self._trained = True
+    def train(self, price_history):
+        Xs, ys = self._extract_data(price_history)
+        scales = Xs[:, 0, 1].reshape(-1, 1, 1).copy()
+        Xs[:, :, [5]] /= scales
+        Xs[:, :, :4] /= scales
+
+        ys_pt = torch.LongTensor(ys > 0)
+        xs_pt = torch.zeros(size=(Xs.shape[0], 120, 45), dtype=torch.uint8)
+        for i in range(Xs.shape[0]):
+            xs_pt[i] = torch.tensor(make_image(Xs[i]))
+
+        ds_train = torch.utils.data.TensorDataset(xs_pt, ys_pt)
+        m = StockCNN()
+        m = m.to(DEVICE)
+        opt = torch.optim.Adam(m.parameters(), lr=LEARNING_RATE)
+        loss_fn = torch.nn.CrossEntropyLoss()
+
+        dl_train = torch.utils.data.DataLoader(ds_train, batch_size=BATCH_SIZE, shuffle=True)
+
+        for ep in range(NUM_EPOCHS):
+            train_total_loss = 0
+            train_n_batches = 0
+            train_n_hits = 0
+            train_n_total = 0
+
+            for xs, ys in dl_train:
+                xs = xs.to(DEVICE)
+                xs = xs.unsqueeze(1).float() / 255.0
+                ys = ys.to(DEVICE).squeeze()
+                opt.zero_grad()
+                y_hat = m(xs)
+                loss = loss_fn(y_hat, ys)
+                loss.backward()
+
+                train_total_loss += loss.cpu().item()
+                train_n_batches += 1
+                train_n_hits += (torch.argmax(y_hat, dim=-1) == ys).sum().cpu().item()
+                train_n_total += y_hat.shape[0]
+
+                opt.step()
+
+        self._model = m
+        self._trained = True
 
 

@@ -6,6 +6,20 @@ class XGBStrategy:
         self._retrain_every = retrain_every
         self._trained = False
 
+    #def get_dollar_weights(self, backtester, adj_universe, price_by_ticker):
+    #    if (backtester.n_day + 1) % self._retrain_every == 0:
+    #        self.train(backtester.price_history)
+#
+    #    if not self._trained:
+    #        return {ticker: 0 for ticker in adj_universe}
+    #    else:
+    #        preds = self.infer(adj_universe, backtester.price_history)
+    #        pos_weights = set(k for k, v in preds.items() if v > 0.01)
+    #        print(len(adj_universe), len(pos_weights))
+    #        if not pos_weights:
+    #            return {ticker: 0 for ticker in adj_universe}
+    #        return {ticker: 1/len(pos_weights) if ticker in pos_weights else 0 for ticker in adj_universe}
+
     def get_dollar_weights(self, backtester, adj_universe, price_by_ticker):
         if (backtester.n_day + 1) % self._retrain_every == 0:
             self.train(backtester.price_history)
@@ -14,11 +28,13 @@ class XGBStrategy:
             return {ticker: 0 for ticker in adj_universe}
         else:
             preds = self.infer(adj_universe, backtester.price_history)
-            pos_weights = set(k for k, v in preds.items() if v > 0.01)
-            print(len(adj_universe), len(pos_weights))
-            if not pos_weights:
+            pos_weights = {k: max(v, 0) for k, v in preds.items() if v > 0}  # using max to ensure no negative values
+            total_weight = sum(pos_weights.values())
+            if total_weight == 0:
                 return {ticker: 0 for ticker in adj_universe}
-            return {ticker: 1/len(pos_weights) if ticker in pos_weights else 0 for ticker in adj_universe}
+            normalized_weights = {ticker: weight/total_weight for ticker, weight in pos_weights.items()}
+            return {ticker: normalized_weights.get(ticker, 0) for ticker in adj_universe}
+
 
     def infer(self, adj_universe, price_history):
         price_matrix = price_history.get_price_matrix()
