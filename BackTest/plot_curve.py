@@ -25,7 +25,8 @@ def compare_equity_curves(backtesters):
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    plt.show()
+    #plt.show()
+    plt.savefig('equity_curve_comparison.png')
 
 if __name__ == '__main__':
     pickles = sys.argv[1:]

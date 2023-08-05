@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 BATCH_SIZE = 128
 LEARNING_RATE = 1e-4
 NUM_EPOCHS = 3
@@ -122,10 +122,14 @@ class CNNStrategy:
         for i in range(Xs.shape[0]):
             xs_pt[i] = torch.tensor(make_image(Xs[i]))
 
+        xs_pt = xs_pt.float() / 255.0
+        xs_pt = xs_pt.unsqueeze(1)
+
+
         with torch.inference_mode():
             y_hats = self._model(xs_pt).cpu().numpy()
 
-        y_argmaxes = np.argmax(y_hats, dim=-1)
+        y_argmaxes = np.argmax(y_hats, axis=-1)
         n_pos = y_argmaxes.sum()
 
         out = {}
@@ -174,10 +178,10 @@ class CNNStrategy:
             for j in range(1, len(adj_close_ema)):
                 adj_close_ema[j] = (1 - ema_const) * adj_close_ema[j-1] + ema_const * adj_close_ema[j]
 
-            for j, t in input_types:
+            for j, t in enumerate(input_types):
                 price_series = price_matrix_by_type[t][-input_window:, v]
                 X_pred[i, :, j] = price_series
-            X_pred[i, :, -1] = adj_close_ema
+            X_pred[i, :, -1] = adj_close_ema[-15:]
 
         return X_pred, fix_id_by_adj_universe
 
@@ -263,6 +267,8 @@ class CNNStrategy:
 
         np.savez('inputs.npz', X, y)
 
+        return X, y
+
     def train(self, price_history):
         Xs, ys = self._extract_data(price_history)
         scales = Xs[:, 0, 1].reshape(-1, 1, 1).copy()
@@ -277,6 +283,7 @@ class CNNStrategy:
         ds_train = torch.utils.data.TensorDataset(xs_pt, ys_pt)
         m = StockCNN()
         m = m.to(DEVICE)
+        m = torch.nn.DataParallel(m)
         opt = torch.optim.Adam(m.parameters(), lr=LEARNING_RATE)
         loss_fn = torch.nn.CrossEntropyLoss()
 

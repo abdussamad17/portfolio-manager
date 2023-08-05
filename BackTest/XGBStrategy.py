@@ -95,7 +95,7 @@ class XGBStrategy:
                 i += 1
 
         dtrain = xgb.DMatrix(X, label=y)
-        self._model = xgb.train({}, dtrain, num_boost_round=100)
+        self._model = xgb.train({'tree_method': 'gpu_hist'}, dtrain, num_boost_round=100)
         self._trained = True
 
 
