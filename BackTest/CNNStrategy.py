@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from scipy.special import expit
 
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 BATCH_SIZE = 128
@@ -99,9 +100,10 @@ class StockCNN(torch.nn.Module):
         return x
 
 class CNNStrategy:
-    def __init__(self, retrain_every=252):
+    def __init__(self,strategy_type, retrain_every=252):
         self._retrain_every = retrain_every
         self._trained = False
+        self._strategy_type = strategy_type
 
     def get_dollar_weights(self, backtester, adj_universe, price_by_ticker):
         if (backtester.n_day + 1) % self._retrain_every == 0:
@@ -129,16 +131,59 @@ class CNNStrategy:
         with torch.inference_mode():
             y_hats = self._model(xs_pt).cpu().numpy()
 
-        y_argmaxes = np.argmax(y_hats, axis=-1)
-        n_pos = y_argmaxes.sum()
+        if self._strategy_type == "equalpositive":
 
-        out = {}
-        for i, (t, v) in enumerate(fix_id_by_adj_universe.items()):
-            out[t] = 1/n_pos if y_argmaxes[i] > 0 else 0
-        for t in adj_universe:
-            if not t in out:
-                out[t] = 0
-        return out
+            y_argmaxes = np.argmax(y_hats, axis=-1)
+            n_pos = y_argmaxes.sum()
+
+            out = {}
+            for i, (t, v) in enumerate(fix_id_by_adj_universe.items()):
+                out[t] = 1/n_pos if y_argmaxes[i] > 0 else 0
+            for t in adj_universe:
+                if not t in out:
+                    out[t] = 0
+            return out
+
+        if self._strategy_type == "equalpercent":
+
+            n_stocks_to_invest = int(len(y_hats) * 0.10)
+            sorted_stocks = sorted(zip(fix_id_by_adj_universe.keys(), y_hats[:, 1]), key=lambda x: x[1], reverse=True)
+
+            out = {}
+
+            for i, (ticker, _) in enumerate(sorted_stocks):
+                if i < n_stocks_to_invest:
+                    out[ticker] = 1/n_stocks_to_invest
+                else:
+                    out[ticker] = 0
+
+            # Assign a weight of 0 to any stocks in the adjusted universe that were not included in the prediction
+            for ticker in adj_universe:
+                if ticker not in out:
+                    out[ticker] = 0
+
+            return out
+
+        if self._strategy_type == "sigmoid":
+
+            out = {}
+            stocks_with_positive_y_hat = [i for i, y_hat in enumerate(y_hats) if y_hat[1] > y_hat[0]]
+            y_hats_positive = y_hats[stocks_with_positive_y_hat, 1]
+            mean_y_hat_positive = np.mean(y_hats_positive)
+            sigma_y_hat_positive = np.std(y_hats_positive)
+
+
+            for i, (ticker, _) in enumerate(fix_id_by_adj_universe.items()):
+                if i in stocks_with_positive_y_hat:
+                    out[ticker] = expit((y_hats[i, 1] - mean_y_hat_positive) / sigma_y_hat_positive)
+                else:
+                    out[ticker] = 0
+
+            total_weight = sum(out.values())
+            for ticker in out:
+                out[ticker] /= total_weight
+
+            return out
 
     def _extract_data_for_inference(self, price_history, adj_universe):
         input_types =  [

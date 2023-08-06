@@ -588,6 +588,9 @@ if __name__ == '__main__':
         params['vol_weighted'] = bool(params['vol_weighted'])
         params['max_concentration'] = bool(params['max_concentration'])
 
+    if sp[0] == 'CNNStrategy':
+        params['strategy_type'] = str(params['strategy_type'])
+
     strat_class = strategy_by_name[sp[0]]
 
     bt = Backtester(strat_class(**params))
