@@ -61,18 +61,38 @@ def display_json_data(json_data_list, backtesters):
     # Ask the user to choose a date for the portfolio constituents
     selected_date = st.date_input("Choose a date to view portfolio constituents", value=pd.to_datetime(json_data_list[0][0]['date']), min_value=pd.to_datetime(json_data_list[0][0]['date']), max_value=pd.to_datetime(json_data_list[0][-1]['date']))
 
+    # Initialize figure for Portfolio Constituents
+    constituents_fig = go.Figure()
+
+    scaling_factor = 10
+    plot_width = 1000
+    plot_height = 600
+
+
+
     # Loop through each strategy's json_data to plot Portfolio Constituents
     for json_data, backtester in zip(json_data_list, backtesters):
         selected_data = [item for item in json_data if item["date"] == selected_date.strftime('%Y-%m-%d')][0]
         portfolio = selected_data['portfolio']
         portfolio_df = pd.DataFrame(list(portfolio.items()), columns=['Asset', 'Value'])
-        portfolio_df['Weight'] = (portfolio_df['Value'] / portfolio_df['Value'].sum() * 100).astype(float)
+        portfolio_df['Weight'] = (portfolio_df['Value'] / portfolio_df['Value'].sum() * 100).astype(float) * scaling_factor
+        portfolio_df['Strategy'] = backtester.strategy_name
 
+        # Adding scatter trace for portfolio constituents
+        constituents_fig.add_trace(go.Scatter(x=portfolio_df['Asset'], y=portfolio_df['Value'], mode='markers', marker=dict(size=portfolio_df['Weight'], sizemode='diameter'), text=portfolio_df['Asset'], name=backtester.strategy_name))
 
-        # Bubble plot for portfolio constituents
-        constituents_fig = px.scatter(portfolio_df, x='Asset', y='Value', size='Weight', text='Asset', title=f"Portfolio Constituents - {backtester.strategy_name}")
-        constituents_fig.update_traces(textposition='top center')
-        st.plotly_chart(constituents_fig)
+    constituents_fig.update_layout(
+        title="Portfolio Constituents",
+        xaxis_title="Asset",
+        yaxis_title="Value",
+        showlegend=True,
+        width=plot_width,  # Set the width
+        height=plot_height # Set the height
+    )
+
+    constituents_fig.update_traces(textposition='top center')
+    st.plotly_chart(constituents_fig)
+
 
 
 
