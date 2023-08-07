@@ -104,7 +104,10 @@ for i in range(number_of_strategies):
     # Check if the file exists locally; if not, download from S3
     if not os.path.exists(local_file_path):
         bucket_name = "streamlitportfoliobucket"
-        pickle_file = download_file(bucket_name, pickle_file_name, local_file_path)
+        try:
+            pickle_file = download_file(bucket_name, pickle_file_name, local_file_path)
+        except FileNotFoundError:
+            pickle_file = None
 
     # Check again if the file exists (either locally or just downloaded)
     if os.path.exists(local_file_path):
@@ -112,7 +115,7 @@ for i in range(number_of_strategies):
             backtester = pickle.load(f)
             backtesters.append(backtester)
     else:
-        st.error(f"The strategy with the parameters does not exist.")
+        st.info('This strategy is not yet available. Please try again later or choose another strategy', icon="🚨")
 
 # Plot equity curve
 fig = go.Figure()
