@@ -39,40 +39,40 @@ def load_json_data(file_path):
         st.info('This strategy is not yet available. Please try again later or choose another strategy', icon="🚨")
 
 # Function to display the JSON data in Streamlit
-def display_json_data(json_data):
-    available_dates = [item["date"] for item in json_data]
-    min_date = datetime.datetime.strptime(min(available_dates), '%Y-%m-%d')
-    max_date = datetime.datetime.strptime(max(available_dates), '%Y-%m-%d')
+def display_json_data(json_data_list, backtesters):
+    # Initialize figure for Portfolio Metrics
+    metrics_fig = go.Figure()
 
-    selected_date = st.date_input("Choose a date to view details", value=min_date, min_value=min_date, max_value=max_date)
-    selected_date_str = selected_date.strftime('%Y-%m-%d')
-    selected_data = [item for item in json_data if item["date"] == selected_date_str][0]
+    # Loop through each strategy's json_data and backtester
+    for json_data, backtester in zip(json_data_list, backtesters):
+        # Convert json_data to DataFrame
+        df = pd.DataFrame(json_data)
+        df['date'] = pd.to_datetime(df['date'])
 
-    col1, col2, col3 = st.columns([1, 1, 1])
+        # Plotting Portfolio Metrics for each strategy
+        metrics_fig.add_trace(go.Scatter(x=df['date'], y=df['pv'], mode='lines', name=f'{backtester.strategy_name} - Portfolio Value'))
+        metrics_fig.add_trace(go.Scatter(x=df['date'], y=df['cash'], mode='lines', name=f'{backtester.strategy_name} - Cash'))
+        # Add more metrics if needed
 
-    with col1:
-        st.subheader("Portfolio Metrics:")
-        st.markdown(f"**Portfolio Value:** ${selected_data['pv']:,.2f}")
-        st.markdown(f"**Cash:** ${selected_data['cash']:,.2f}")
-        st.markdown(f"**Turnover:** {selected_data['turnover']:,.2f}")
+    # Update layout and plot the combined metrics figure
+    metrics_fig.update_layout(title="Portfolio Metrics Over Time", xaxis_title="Date")
+    st.plotly_chart(metrics_fig)
 
-    with col2:
-        st.subheader("Additional Metrics:")
-        st.markdown(f"**Cost:** ${selected_data['cost']:,.2f}")
-        st.markdown(f"**Gini Coefficient:** {selected_data['gini']:,.2f}")
+    # Ask the user to choose a date for the portfolio constituents
+    selected_date = st.date_input("Choose a date to view portfolio constituents", value=pd.to_datetime(json_data_list[0][0]['date']), min_value=pd.to_datetime(json_data_list[0][0]['date']), max_value=pd.to_datetime(json_data_list[0][-1]['date']))
 
-    with col3:
-        st.subheader("Stock Information:")
-        st.markdown(f"**Number of Stocks:** {selected_data['n_stocks']}")
+    # Loop through each strategy's json_data to plot Portfolio Constituents
+    for json_data, backtester in zip(json_data_list, backtesters):
+        selected_data = [item for item in json_data if item["date"] == selected_date.strftime('%Y-%m-%d')][0]
+        portfolio = selected_data['portfolio']
+        portfolio_df = pd.DataFrame(list(portfolio.items()), columns=['Asset', 'Value'])
+        portfolio_df['Weight'] = (portfolio_df['Value'] / portfolio_df['Value'].sum() * 100).astype(float)
 
-    st.markdown("#### Portfolio Constituents:")
 
-    portfolio = selected_data['portfolio']
-    portfolio_df = pd.DataFrame(list(portfolio.items()), columns=['Asset', 'Value'])
-    portfolio_df['Weight'] = portfolio_df['Value'] / portfolio_df['Value'].sum()
-    portfolio_df['Weight'] = portfolio_df['Weight'] * 100
-
-    st.table(portfolio_df)
+        # Bubble plot for portfolio constituents
+        constituents_fig = px.scatter(portfolio_df, x='Asset', y='Value', size='Weight', text='Asset', title=f"Portfolio Constituents - {backtester.strategy_name}")
+        constituents_fig.update_traces(textposition='top center')
+        st.plotly_chart(constituents_fig)
 
 
 
@@ -122,6 +122,7 @@ strategies = ["EqualDollarStrategy", "EqualVolStrategy", "MinimumVarianceStrateg
 
 number_of_strategies = st.sidebar.slider("Number of strategies to compare", 1, len(strategies))
 
+json_data_list = []
 backtesters = []
 for i in range(number_of_strategies):
     st.sidebar.markdown(f"## Strategy {i+1}")
@@ -155,6 +156,8 @@ for i in range(number_of_strategies):
     local_file_path = f"{pickle_file_name}"
 
     json_file_name = f"{full_strategy}.json"
+    json_data = load_json_data(json_file_name)
+    json_data_list.append(json_data)
 
     # Check if the file exists locally; if not, download from S3
     if not os.path.exists(local_file_path):
@@ -181,4 +184,4 @@ for backtester in backtesters:
 st.plotly_chart(fig)
 
 json_data = load_json_data(json_file_name)
-display_json_data(json_data)
+display_json_data(json_data_list, backtesters)
