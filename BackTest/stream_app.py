@@ -24,14 +24,14 @@ def download_file(bucket_name, file_path, local_file_path):
     return local_file_path
 
 def load_json_data(file_path):
-    if not os.path.exists(local_file_path):
+    if not os.path.exists(file_path):
         bucket_name = "streamlitportfoliobucket"
         try:
-            json_file = download_file(bucket_name, pickle_file_name, local_file_path)
+            json_file = download_file(bucket_name, file_path, file_path)
         except FileNotFoundError:
             json_file = None
 
-    if os.path.exists(local_file_path):
+    if os.path.exists(file_path):
         with open(file_path, 'r') as f:
             data = [json.loads(line) for line in f.readlines()]
         return data
