@@ -7,6 +7,9 @@ import streamlit as st
 import s3fs
 import plotly.graph_objs as go
 import os
+from dotenv import load_dotenv
+import pickle
+from Testback import *
 
 load_dotenv()
 os.environ['AWS_ACCESS_KEY_ID'] = os.getenv('AWS_ACCESS_KEY_ID')
@@ -14,15 +17,9 @@ os.environ['AWS_SECRET_ACCESS_KEY'] = os.getenv('AWS_SECRET_ACCESS_KEY')
 
 
 def download_file(bucket_name, file_path, local_file_path):
-    fs = s3fs.S3FileSystem(anon=False)  # Use `anon=True` to read public data.
-
-    # Create a full S3 path.
+    fs = s3fs.S3FileSystem(anon=False)
     s3_file_path = f"{bucket_name}/{file_path}"
-
-    # Download the file.
     fs.get(s3_file_path, local_file_path)
-
-    # Return the local file path.
     return local_file_path
 
 
@@ -101,9 +98,17 @@ for i in range(number_of_strategies):
         strategy_type_choice = st.sidebar.selectbox(f"Select Strategy Type for Strategy {i+1}", strategy_types)
         full_strategy += f",strategy_type={str(strategy_type_choice)}"
 
-    pickle_file = f"{full_strategy}.pkl"
-    if os.path.exists(pickle_file):
-        with open(pickle_file, 'rb') as f:
+    pickle_file_name = f"{full_strategy}.pkl"
+    local_file_path = f"{pickle_file_name}"
+
+    # Check if the file exists locally; if not, download from S3
+    if not os.path.exists(local_file_path):
+        bucket_name = "streamlitportfoliobucket"
+        pickle_file = download_file(bucket_name, pickle_file_name, local_file_path)
+
+    # Check again if the file exists (either locally or just downloaded)
+    if os.path.exists(local_file_path):
+        with open(local_file_path, 'rb') as f:
             backtester = pickle.load(f)
             backtesters.append(backtester)
     else:
