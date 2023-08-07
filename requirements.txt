@@ -10,3 +10,4 @@ python-dateutil
 xgboost
 s3fs
 streamlit
+plotly
