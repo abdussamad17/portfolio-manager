@@ -6,10 +6,16 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 import sys
 import pickle
+from dotenv import load_dotenv
+import s3fs
 
 from HRPStrategy import HRPStrategy
 from XGBStrategy import XGBStrategy
 from CNNStrategy import CNNStrategy
+
+load_dotenv()
+os.environ['AWS_ACCESS_KEY_ID'] = os.getenv('AWS_ACCESS_KEY_ID')
+os.environ['AWS_SECRET_ACCESS_KEY'] = os.getenv('AWS_SECRET_ACCESS_KEY')
 
 
 class EqualVolStrategy:
@@ -295,6 +301,12 @@ class Backtester:
         self.ret_all_time = 0
         self.vol_all_time = 0
         self.price_history = PriceHistory()
+    @staticmethod
+    def upload_to_s3(local_file_path, s3_file_path):
+        bucket_name = "streamlitportfoliobucket"
+        fs = s3fs.S3FileSystem(anon=False)
+        full_s3_path = f"{bucket_name}/{s3_file_path}"
+        fs.put(local_file_path, full_s3_path)
 
     def _try_get_universe_by_date(self, date):
         storage_folder = os.path.join(
@@ -523,15 +535,18 @@ class Backtester:
             self.date += datetime.timedelta(days=1)
 
         save_name = self.get_save_name(strategy_name)
+        json_file_name = f'{save_name}.json'
+        pkl_file_name = f'{save_name}.pkl'
 
-        with open(f'{save_name}.json', "w") as fo:
+        with open(json_file_name, "w") as fo:
             for snap in self.snapshots:
                 json.dump(snap, fo)
                 fo.write("\n")
+        self.upload_to_s3(json_file_name, json_file_name)
 
-        with open(f'{save_name}.pkl' , "wb") as x:
+        with open(pkl_file_name, "wb") as x:
             pickle.dump(self, x)
-
+        self.upload_to_s3(pkl_file_name, pkl_file_name)
 
     def _get_price(self, ticker, date):
         try:

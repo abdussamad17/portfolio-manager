@@ -8,3 +8,5 @@ torch
 python-dotenv
 python-dateutil
 xgboost
+s3fs
+streamlit

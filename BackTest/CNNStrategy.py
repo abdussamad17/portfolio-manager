@@ -185,6 +185,20 @@ class CNNStrategy:
 
             return out
 
+        if self._strategy_type == "marketindicator":
+            positive_stocks = np.sum(y_hats[:, 1] > y_hats[:, 0])
+            total_stocks = y_hats.shape[0]
+            exposure_ratio = positive_stocks / total_stocks
+
+            out = {}
+            for ticker in adj_universe:
+                out[ticker] = 1.0 / len(adj_universe)
+
+            for ticker in out:
+                out[ticker] *= exposure_ratio
+
+            return out
+
     def _extract_data_for_inference(self, price_history, adj_universe):
         input_types =  [
                     'adj_close',
