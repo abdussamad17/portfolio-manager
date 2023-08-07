@@ -16,11 +16,64 @@ os.environ['AWS_ACCESS_KEY_ID'] = os.getenv('AWS_ACCESS_KEY_ID')
 os.environ['AWS_SECRET_ACCESS_KEY'] = os.getenv('AWS_SECRET_ACCESS_KEY')
 
 
+
 def download_file(bucket_name, file_path, local_file_path):
     fs = s3fs.S3FileSystem(anon=False)
     s3_file_path = f"{bucket_name}/{file_path}"
     fs.get(s3_file_path, local_file_path)
     return local_file_path
+
+def load_json_data(file_path):
+    if not os.path.exists(local_file_path):
+        bucket_name = "streamlitportfoliobucket"
+        try:
+            json_file = download_file(bucket_name, pickle_file_name, local_file_path)
+        except FileNotFoundError:
+            json_file = None
+
+    if os.path.exists(local_file_path):
+        with open(file_path, 'r') as f:
+            data = [json.loads(line) for line in f.readlines()]
+        return data
+    else:
+        st.info('This strategy is not yet available. Please try again later or choose another strategy', icon="🚨")
+
+# Function to display the JSON data in Streamlit
+def display_json_data(json_data):
+    available_dates = [item["date"] for item in json_data]
+    min_date = datetime.datetime.strptime(min(available_dates), '%Y-%m-%d')
+    max_date = datetime.datetime.strptime(max(available_dates), '%Y-%m-%d')
+
+    selected_date = st.date_input("Choose a date to view details", value=min_date, min_value=min_date, max_value=max_date)
+    selected_date_str = selected_date.strftime('%Y-%m-%d')
+    selected_data = [item for item in json_data if item["date"] == selected_date_str][0]
+
+    col1, col2, col3 = st.columns([1, 1, 1])
+
+    with col1:
+        st.subheader("Portfolio Metrics:")
+        st.markdown(f"**Portfolio Value:** ${selected_data['pv']:,.2f}")
+        st.markdown(f"**Cash:** ${selected_data['cash']:,.2f}")
+        st.markdown(f"**Turnover:** {selected_data['turnover']:,.2f}")
+
+    with col2:
+        st.subheader("Additional Metrics:")
+        st.markdown(f"**Cost:** ${selected_data['cost']:,.2f}")
+        st.markdown(f"**Gini Coefficient:** {selected_data['gini']:,.2f}")
+
+    with col3:
+        st.subheader("Stock Information:")
+        st.markdown(f"**Number of Stocks:** {selected_data['n_stocks']}")
+
+    st.markdown("#### Portfolio Constituents:")
+
+    portfolio = selected_data['portfolio']
+    portfolio_df = pd.DataFrame(list(portfolio.items()), columns=['Asset', 'Value'])
+    portfolio_df['Weight'] = portfolio_df['Value'] / portfolio_df['Value'].sum()
+    portfolio_df['Weight'] = portfolio_df['Weight'] * 100
+
+    st.table(portfolio_df)
+
 
 
 def plot_equity_curve(backtester, fig=None):
@@ -101,6 +154,8 @@ for i in range(number_of_strategies):
     pickle_file_name = f"{full_strategy}.pkl"
     local_file_path = f"{pickle_file_name}"
 
+    json_file_name = f"{full_strategy}.json"
+
     # Check if the file exists locally; if not, download from S3
     if not os.path.exists(local_file_path):
         bucket_name = "streamlitportfoliobucket"
@@ -117,8 +172,13 @@ for i in range(number_of_strategies):
     else:
         st.info('This strategy is not yet available. Please try again later or choose another strategy', icon="🚨")
 
+
+
 # Plot equity curve
 fig = go.Figure()
 for backtester in backtesters:
     fig = plot_equity_curve(backtester, fig)
 st.plotly_chart(fig)
+
+json_data = load_json_data(json_file_name)
+display_json_data(json_data)
