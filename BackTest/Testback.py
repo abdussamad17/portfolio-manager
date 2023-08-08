@@ -516,16 +516,19 @@ class Backtester:
 
     @staticmethod
     def get_save_name(strategy_name):
-        numberless = f"{strategy_name}.pkl"
-        if not os.path.isfile(numberless):
-            return strategy_name
 
-        for i in range(1, 99999):
-            test_name = f"{strategy_name}_{i}.pkl"
-            if not os.path.isfile(test_name):
-                return f"{strategy_name}_{i}"
+        return strategy_name
+        #numberless = f"{strategy_name}.pkl"
+        #if not os.path.isfile(numberless):
+        #    return strategy_name
 
-        assert False
+        #for i in range(1, 99999):
+        #    test_name = f"{strategy_name}_{i}.pkl"
+        #    if not os.path.isfile(test_name):
+        #        return f"{strategy_name}_{i}"
+
+
+
 
     def run(self, strategy_name):
         self.strategy_name = strategy_name
@@ -535,8 +538,10 @@ class Backtester:
             self.date += datetime.timedelta(days=1)
 
         save_name = self.get_save_name(strategy_name)
-        json_file_name = f'{save_name}.json'
-        pkl_file_name = f'{save_name}.pkl'
+        os.makedirs('model_results', exist_ok=True)
+
+        json_file_name = f'model_results/{save_name}.json'
+        pkl_file_name = f'model_results/{save_name}.pkl'
 
         with open(json_file_name, "w") as fo:
             for snap in self.snapshots:

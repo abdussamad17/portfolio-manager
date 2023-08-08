@@ -6,6 +6,7 @@ from dateutil.relativedelta import relativedelta
 from dateutil import parser
 import shutil
 
+EARLY_EXIT = True
 
 class UniverseConstructor:
     def __init__(self):
@@ -77,6 +78,9 @@ class UniverseConstructor:
             min(self._get_date(change["date"]) for change in constituent_changes),
             min(self._get_date(change["date"]) for change in ticker_changes),
         ):
+            if os.path.isfile("universe" + str(current_date)) and EARLY_EXIT:
+                return
+
             change_made = 0
             for change in constituent_changes_by_date[current_date]:
                 if change["addedSecurity"]:

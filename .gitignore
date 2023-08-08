@@ -11,3 +11,5 @@ Backtest/aaa/*.json
 classes_Portfolio_manager.dot
 BackTest/inputs.npz
 BackTest/inputs.npz.x
+BackTest/models
+BackTest/traincache

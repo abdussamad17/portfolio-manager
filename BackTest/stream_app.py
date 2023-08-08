@@ -15,7 +15,7 @@ load_dotenv()
 os.environ['AWS_ACCESS_KEY_ID'] = os.getenv('AWS_ACCESS_KEY_ID')
 os.environ['AWS_SECRET_ACCESS_KEY'] = os.getenv('AWS_SECRET_ACCESS_KEY')
 
-
+model_results_path = "model_results"
 
 def download_file(bucket_name, file_path, local_file_path):
     fs = s3fs.S3FileSystem(anon=False)
@@ -173,10 +173,11 @@ for i in range(number_of_strategies):
         full_strategy += f",strategy_type={str(strategy_type_choice)}"
 
     pickle_file_name = f"{full_strategy}.pkl"
-    local_file_path = f"{pickle_file_name}"
+    local_file_path = os.path.join(model_results_path, f"{pickle_file_name}")
 
     json_file_name = f"{full_strategy}.json"
-    json_data = load_json_data(json_file_name)
+    json_file_path = os.path.join(model_results_path, json_file_name)
+    json_data = load_json_data(json_file_path)
     json_data_list.append(json_data)
 
     # Check if the file exists locally; if not, download from S3
