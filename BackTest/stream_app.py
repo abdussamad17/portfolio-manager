@@ -86,8 +86,8 @@ def display_json_data(json_data_list, backtesters):
         xaxis_title="Asset",
         yaxis_title="Value",
         showlegend=True,
-        width=plot_width,  # Set the width
-        height=plot_height # Set the height
+        width=plot_width,
+        height=plot_height
     )
 
     constituents_fig.update_traces(textposition='top center')
