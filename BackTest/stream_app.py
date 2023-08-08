@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 import pickle
 from Testback import *
+import time
 
 load_dotenv()
 os.environ['AWS_ACCESS_KEY_ID'] = os.getenv('AWS_ACCESS_KEY_ID')
@@ -23,20 +24,31 @@ def download_file(bucket_name, file_path, local_file_path):
     fs.get(s3_file_path, local_file_path)
     return local_file_path
 
+import time
+
 def load_json_data(file_path):
-    if not os.path.exists(file_path):
+    local_path = os.path.join(model_results_path, file_path)
+    st.info(local_path)
+    if not os.path.exists(local_path):
         bucket_name = "streamlitportfoliobucket"
         try:
-            json_file = download_file(bucket_name, file_path, file_path)
+            json_file = download_file(bucket_name, file_path, local_path)
         except FileNotFoundError:
             json_file = None
 
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as f:
+        # Wait for the file to be downloaded, checking every second
+        timeout = 10  # Timeout in seconds
+        start_time = time.time()
+        while not os.path.exists(local_path) and time.time() - start_time < timeout:
+            time.sleep(1)
+
+    if os.path.exists(local_path):
+        with open(local_path, 'r') as f:
             data = [json.loads(line) for line in f.readlines()]
         return data
     else:
         st.info('This strategy is not yet available. Please try again later or choose another strategy', icon="🚨")
+
 
 # Function to display the JSON data in Streamlit
 def display_json_data(json_data_list, backtesters):
@@ -176,8 +188,7 @@ for i in range(number_of_strategies):
     local_file_path = os.path.join(model_results_path, f"{pickle_file_name}")
 
     json_file_name = f"{full_strategy}.json"
-    json_file_path = os.path.join(model_results_path, json_file_name)
-    json_data = load_json_data(json_file_path)
+    json_data = load_json_data(json_file_name)
     json_data_list.append(json_data)
 
     # Check if the file exists locally; if not, download from S3
