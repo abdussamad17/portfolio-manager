@@ -5,6 +5,8 @@ DataExtracts/
 BackTest/backtest.json
 BackTest/VolatilityBacktest.json
 BackTest/*.pkl
+*.pkl
+*.json
 BackTest/*.json
 Backtest/aaa/*.pkl
 Backtest/aaa/*.json
