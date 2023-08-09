@@ -3,29 +3,22 @@ from email.mime.text import MIMEText
 from dotenv import load_dotenv
 import os
 import datetime
+import sys
 
 today = datetime.datetime.now().date()
-log_file_path = f"../../logs/{today}.log"
 
 load_dotenv()
 SMTP_USERNAME = os.getenv('SMTP_USERNAME')
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 
-def send_notification_email():
+def send_notification_email(notification_message):
     # Define the email addresses
     sender_email = "abdussamadusman99@gmail.com"
     receiver_email = "abdussamadusman99@gmail.com"
 
-    # Read the log file content
-    try:
-        with open(log_file_path, 'r') as file:
-            log_content = file.read()
-    except FileNotFoundError:
-        log_content = f"No log file found for {today}"
-
     # Create the email subject and body
-    subject = f"Process Completion Notification on {today}"
-    body = f"The process has been completed successfully on {today}\n\nLog Content:\n{log_content}"
+    subject = str(today)
+    body = notification_message
 
     # Create the email object
     email = MIMEText(body)
@@ -51,5 +44,7 @@ def send_notification_email():
     finally:
         server.quit()
 
+# Get the notification message from the command line argument
+notification_message = sys.argv[1] if len(sys.argv) > 1 else "No specific message"
 # Call the function to send the email
-send_notification_email()
+send_notification_email(notification_message)

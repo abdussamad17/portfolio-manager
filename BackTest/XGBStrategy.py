@@ -1,10 +1,12 @@
 import numpy as np
 import xgboost as xgb
+import torch
 
 class XGBStrategy:
-    def __init__(self, retrain_every=252):
+    def __init__(self, retrain_every=252, regression=True):
         self._retrain_every = retrain_every
         self._trained = False
+        self._regression = regression
 
     #def get_dollar_weights(self, backtester, adj_universe, price_by_ticker):
     #    if (backtester.n_day + 1) % self._retrain_every == 0:
@@ -28,12 +30,21 @@ class XGBStrategy:
             return {ticker: 0 for ticker in adj_universe}
         else:
             preds = self.infer(adj_universe, backtester.price_history)
-            pos_weights = {k: max(v, 0) for k, v in preds.items() if v > 0}  # using max to ensure no negative values
-            total_weight = sum(pos_weights.values())
-            if total_weight == 0:
-                return {ticker: 0 for ticker in adj_universe}
-            normalized_weights = {ticker: weight/total_weight for ticker, weight in pos_weights.items()}
-            return {ticker: normalized_weights.get(ticker, 0) for ticker in adj_universe}
+            if self._regression:
+                pos_weights = {k: max(v, 0) for k, v in preds.items() if v > 0}  # using max to ensure no negative values
+                total_weight = sum(pos_weights.values())
+                if total_weight == 0:
+                    return {ticker: 0 for ticker in adj_universe}
+                normalized_weights = {ticker: weight/total_weight for ticker, weight in pos_weights.items()}
+                return {ticker: normalized_weights.get(ticker, 0) for ticker in adj_universe}
+            else:
+                pred_values = list(preds.items())
+                pred_values.sort(key=lambda x:x[1], reverse=True)
+                weights = {}
+                for k, v in pred_values[:len(pred_values)//10]:
+                    weights[k] = 1
+                normalized_weights = {ticker: weight/total_weight for ticker, weight in weights.items()}
+                return {ticker: normalized_weights.get(ticker, 0) for ticker in adj_universe}
 
 
     def infer(self, adj_universe, price_history):
@@ -93,9 +104,16 @@ class XGBStrategy:
                 X[i] = price_series[1:input_window+1]/price_series[0:input_window] - 1.0
                 y[i] = price_series[-1]/price_series[input_window+1] - 1.0
                 i += 1
+        params = {}
+        if torch.cuda.is_available():
+            params['tree_method'] = 'gpu_hist'
+
+        if not self._regression:
+            y = (y > 0).astype(np.int)
+            params['objective'] = 'binary:logistic'
 
         dtrain = xgb.DMatrix(X, label=y)
-        self._model = xgb.train({'tree_method': 'gpu_hist'}, dtrain, num_boost_round=100)
+        self._model = xgb.train(params, dtrain, num_boost_round=100)
         self._trained = True
 
 

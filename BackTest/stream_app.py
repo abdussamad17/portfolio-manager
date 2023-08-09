@@ -180,9 +180,14 @@ for i in range(number_of_strategies):
         full_strategy += f",linkage_method={str(linkage_method)}"
 
     elif strategy_choice == "CNNStrategy":
-        strategy_types = ["equalpositive", "equalpercent", "sigmoid"]
+        strategy_types = ["marketindicator", "equalpercent", "sigmoid"]
         strategy_type_choice = st.sidebar.selectbox(f"Select Strategy Type for Strategy {i+1}", strategy_types)
         full_strategy += f",strategy_type={str(strategy_type_choice)}"
+
+    elif strategy_choice == "XGBStrategy":
+        regression = st.sidebar.checkbox(f"Regression {i+1}?")
+        full_strategy += f",regression={str(regression)}"
+
 
     pickle_file_name = f"{full_strategy}.pkl"
     local_file_path = os.path.join(model_results_path, f"{pickle_file_name}")

@@ -280,7 +280,7 @@ class Backtester:
         self.portfolio_value = 0
         self.cash = 1000000
         self.date = datetime.date(1997, 6, 17)
-        self.end_date = datetime.date(2009, 6, 17)
+        self.end_date = datetime.date.today()
         self.daily_returns = []
         self.equity_curve = []
         self.universe = None
@@ -467,7 +467,7 @@ class Backtester:
             'roll_ret': self.ema_ret * 256 * 100,
             'roll_sigma': self.ema_vol**0.5 * 16 * 100,
             'roll_sr': self.ema_ret/self.ema_vol**0.5 * 16,
-            'portfolio': dict(self.portfolio),
+            'portfolio': dict({k: v for k, v in portfolio_values_by_ticker.items() if v > 0}),
         }
         self.snapshots.append(snap)
         #print(self.date, self.universe_date)
@@ -547,11 +547,11 @@ class Backtester:
             for snap in self.snapshots:
                 json.dump(snap, fo)
                 fo.write("\n")
-        self.upload_to_s3(json_file_name, json_file_name)
+        self.upload_to_s3(json_file_name, f"{save_name}.json")
 
         with open(pkl_file_name, "wb") as x:
             pickle.dump(self, x)
-        self.upload_to_s3(pkl_file_name, pkl_file_name)
+        self.upload_to_s3(pkl_file_name, f"{save_name}.pkl")
 
     def _get_price(self, ticker, date):
         try:
@@ -607,9 +607,10 @@ if __name__ == '__main__':
         params['return_estimate'] = float(params['return_estimate'])
         params['vol_weighted'] = bool(params['vol_weighted'])
         params['max_concentration'] = bool(params['max_concentration'])
-
-    if sp[0] == 'CNNStrategy':
+    elif sp[0] == 'CNNStrategy':
         params['strategy_type'] = str(params['strategy_type'])
+    elif sp[0] == 'XGBStrategy':
+        params['regression'] = bool(params['regression'])
 
     strat_class = strategy_by_name[sp[0]]
 
