@@ -21,51 +21,44 @@ cd /home/user/github/portfolio-manager/BackTest
 
 # Generate backtests
 echo "Running backtests"
-## - EqualDollarStrategy
-echo "Running Testback.py EqualDollarStrategy"
-python BackTest/Testback.py EqualDollarStrategy
 
-## - EqualVolStrategy
-echo "Running Testback.py EqualVolStrategy"
-python BackTest/Testback.py EqualVolStrategy
+## - EqualDollarStrategy && EqualVolStrategy
+echo "Running Testback.py EqualDollarStrategy and EqualVolStrategy "
+python Testback.py EqualDollarStrategy &
+python Testback.py EqualVolStrategy &
+
+wait
 
 python ../run_notification.py "Equal dollar and equal vol complete"
 
-## - MinimumVarianceStrategy
-echo "Running Testback.py MinimumVarianceStrategy"
-python BackTest/Testback.py MinimumVarianceStrategy
+## - MinimumVarianceStrategy && EqualVolContributionStrategy
+echo "Running Testback.py MinimumVarianceStrategy & EqualVolContributionStrategy"
+python Testback.py MinimumVarianceStrategy &
+python Testback.py EqualVolContributionStrategy &
 
-
-## - EqualVolContributionStrategy
-echo "Running Testback.py EqualVolContributionStrategy"
-python BackTest/Testback.py EqualVolContributionStrategy
+wait
 
 python ../run_notification.py "minimum variance and Equal vol Contribution - complete"
 
 
 ## - HRPStrategy
-echo "Running Testback.py HRPStrategy"
+echo "Running Testback.py HRPStrategies=average,ward,single"
 
-### - HRPStrategy,linkage_method=average
-echo "Running Testback.py HRPStrategy,linkage_method=average"
-python BackTest/Testback.py HRPStrategy,linkage_method=average
+python Testback.py HRPStrategy,linkage_method=average &
 
-### - HRPStrategy,linkage_method=ward
-echo "Running Testback.py HRPStrategy,linkage_method=ward"
-python BackTest/Testback.py HRPStrategy,linkage_method=ward
+python Testback.py HRPStrategy,linkage_method=ward &
 
-### - HRPStrategy,linkage_method=single
-echo "Running Testback.py HRPStrategy,linkage_method=single"
-python BackTest/Testback.py HRPStrategy,linkage_method=single
+python Testback.py HRPStrategy,linkage_method=single &
 
-python ../run_notification.py "starting XGBStrategy"
-## - XGBStrategy-regression=False
-echo "Running Testback.py XGBStrategy,regression=False"
-python BackTest/Testback.py XGBStrategy,regression=False
+wait
 
-## - XGBStrategy-regression=True
-echo "Running Testback.py XGBStrategy,regression=True"
-python BackTest/Testback.py XGBStrategy,regression=True
+python ../run_notification.py "starting XGBStrategy,regression=False and True"
+## - XGBStrategy-regression=False,regression=True
+
+python Testback.py XGBStrategy,regression=False &
+python Testback.py XGBStrategy,regression=True&
+
+wait
 
 ## - CNNStrategy
 echo "Running CNNStrategy"
@@ -73,34 +66,34 @@ echo "Running CNNStrategy"
 python ../run_notification.py "starting CNNStrategy"
 ### - CNNStrategy, strategy_type=equalpercent
 echo "Running Testback.py CNNStrategy,strategy_type=equalpercent"
-python BackTest/Testback.py CNNStrategy,strategy_type=equalpercent
+python Testback.py CNNStrategy,strategy_type=equalpercent
 
 ### - CNNStrategy, strategy_type=marketindicator
 echo "Running Testback.py CNNStrategy,strategy_type=marketindicator"
-python BackTest/Testback.py CNNStrategy,strategy_type=marketindicator
+python Testback.py CNNStrategy,strategy_type=marketindicator
 
 ### - CNNStrategy, strategy_type=sigmoid
 echo "Running Testback.py CNNStrategy,strategy_type=sigmoid"
-python BackTest/Testback.py CNNStrategy,strategy_type=sigmoid
+python Testback.py CNNStrategy,strategy_type=sigmoid
 
 
 python ../run_notification.py "starting Markowitz"
 
 ## - MarkowitzStrategy
-echo "Running Testback.py MarkowitzStrategy"
+echo "Running Testback.py MarkowitzStrategies"
 
-echo "Running Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=False,max_concentration=1"
-python BackTest/Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=False,max_concentration=1
+python Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=False,max_concentration=1 &
 
-echo "Running Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=True,max_concentration=1"
-python BackTest/Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=True,max_concentration=1
+python Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=True,max_concentration=1 &
 
-echo "Running Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=False,max_concentration=0.05"
-python BackTest/Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=False,max_concentration=0.05
+wait
 
-echo "Running Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=True,max_concentration=0.05"
-python BackTest/Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=True,max_concentration=0.05
+python Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=False,max_concentration=0.05 &
+
+python Testback.py MarkowitzStrategy,risk_constant=1,return_estimate=0.000269,vol_weighted=True,max_concentration=0.05 &
+
+wait
 
 
 # - Send Email
-python ../run_notification.py "starting Markowitz"
+python ../run_notification.py "Complete!"

@@ -28,7 +28,6 @@ import time
 
 def load_json_data(file_path):
     local_path = os.path.join(model_results_path, file_path)
-    st.info(local_path)
     if not os.path.exists(local_path):
         bucket_name = "streamlitportfoliobucket"
         try:
@@ -58,16 +57,17 @@ def display_json_data(json_data_list, backtesters):
     # Loop through each strategy's json_data and backtester
     for json_data, backtester in zip(json_data_list, backtesters):
         # Convert json_data to DataFrame
-        df = pd.DataFrame(json_data)
+        df = pd.DataFrame(json_data, columns=['date', 'roll_sigma', 'cash', 'roll_sr'])
         df['date'] = pd.to_datetime(df['date'])
 
         # Plotting Portfolio Metrics for each strategy
-        metrics_fig.add_trace(go.Scatter(x=df['date'], y=df['pv'], mode='lines', name=f'{backtester.strategy_name} - Portfolio Value'))
-        metrics_fig.add_trace(go.Scatter(x=df['date'], y=df['cash'], mode='lines', name=f'{backtester.strategy_name} - Cash'))
+        #metrics_fig.add_trace(go.Scatter(x=df['date'], y=df['roll_sigma'], mode='lines', name=f'{backtester.strategy_name} - Rolling sigma'))
+        #metrics_fig.add_trace(go.Scatter(x=df['date'], y=df['cash'], mode='lines', name=f'{backtester.strategy_name} - Cash'))
+        metrics_fig.add_trace(go.Scatter(x=df['date'], y=df['roll_sr'], mode='lines', name=f'{backtester.strategy_name} - Rolling Sharpe'))
         # Add more metrics if needed
 
     # Update layout and plot the combined metrics figure
-    metrics_fig.update_layout(title="Portfolio Metrics Over Time", xaxis_title="Date")
+    metrics_fig.update_layout(title="Portfolio Metrics Over Time", xaxis_title="Date",width=1000,height=600,legend=dict(x=0,y=0,traceorder="normal",font=dict(family="sans-serif",size=12,color="white"),))
     st.plotly_chart(metrics_fig)
 
     # Ask the user to choose a date for the portfolio constituents
@@ -185,7 +185,7 @@ for i in range(number_of_strategies):
         full_strategy += f",strategy_type={str(strategy_type_choice)}"
 
     elif strategy_choice == "XGBStrategy":
-        regression = st.sidebar.checkbox(f"Regression {i+1}?")
+        regression = st.sidebar.checkbox(f"Regression for strat {i+1}?")
         full_strategy += f",regression={str(regression)}"
 
 

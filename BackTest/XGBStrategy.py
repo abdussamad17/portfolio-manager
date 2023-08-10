@@ -28,23 +28,24 @@ class XGBStrategy:
 
         if not self._trained:
             return {ticker: 0 for ticker in adj_universe}
+
+        preds = self.infer(adj_universe, backtester.price_history)
+
+        if self._regression:
+            pos_weights = {k: max(v, 0) for k, v in preds.items() if v > 0}  # using max to ensure no negative values
+            total_weight = sum(pos_weights.values())
+            if total_weight == 0:
+                return {ticker: 0 for ticker in adj_universe}
+            normalized_weights = {ticker: weight/total_weight for ticker, weight in pos_weights.items()}
         else:
-            preds = self.infer(adj_universe, backtester.price_history)
-            if self._regression:
-                pos_weights = {k: max(v, 0) for k, v in preds.items() if v > 0}  # using max to ensure no negative values
-                total_weight = sum(pos_weights.values())
-                if total_weight == 0:
-                    return {ticker: 0 for ticker in adj_universe}
-                normalized_weights = {ticker: weight/total_weight for ticker, weight in pos_weights.items()}
-                return {ticker: normalized_weights.get(ticker, 0) for ticker in adj_universe}
-            else:
-                pred_values = list(preds.items())
-                pred_values.sort(key=lambda x:x[1], reverse=True)
-                weights = {}
-                for k, v in pred_values[:len(pred_values)//10]:
-                    weights[k] = 1
-                normalized_weights = {ticker: weight/total_weight for ticker, weight in weights.items()}
-                return {ticker: normalized_weights.get(ticker, 0) for ticker in adj_universe}
+            pred_values = list(preds.items())
+            pred_values.sort(key=lambda x: x[1], reverse=True)
+            weights = {k: 1 for k, v in pred_values[:len(pred_values)//10]}
+            total_weight = sum(weights.values())
+            normalized_weights = {ticker: weight/total_weight for ticker, weight in weights.items()}
+
+        return {ticker: normalized_weights.get(ticker, 0) for ticker in adj_universe}
+
 
 
     def infer(self, adj_universe, price_history):
@@ -109,7 +110,7 @@ class XGBStrategy:
             params['tree_method'] = 'gpu_hist'
 
         if not self._regression:
-            y = (y > 0).astype(np.int)
+            y = (y > 0)
             params['objective'] = 'binary:logistic'
 
         dtrain = xgb.DMatrix(X, label=y)
