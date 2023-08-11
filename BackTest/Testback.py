@@ -375,6 +375,7 @@ class Backtester:
 
     @staticmethod
     def compute_statistics(snapshots):
+        np.seterr(divide='ignore', invalid='ignore')
         # Extract daily portfolio values
         portfolio_values = [snap['pv'] for snap in snapshots if snap['pv']]
 

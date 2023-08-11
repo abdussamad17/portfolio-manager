@@ -109,9 +109,9 @@ class MinimumVarianceStrategy:
             with gp.Model(env=env) as m:
                 w = m.addMVar(shape=num_assets, lb=0, vtype=GRB.CONTINUOUS, name="w")
                 m.setObjective(w @ cov_matrix @ w, GRB.MINIMIZE)
-                m.addConstr(w.sum() == 1000)
+                m.addConstr(w.sum() == 1)
                 m.optimize()
                 # print(m.ObjVal)
                 # Map optimal weights to tickers
-                optimal_weights = {ticker: weight/1000.0 for ticker, weight in zip(adj_universe, w.X)}
+                optimal_weights = {ticker: weight for ticker, weight in zip(adj_universe, w.X)}
                 return optimal_weights

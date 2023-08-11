@@ -129,7 +129,7 @@ def train_model(Xs, ys):
     opt = torch.optim.Adam(m.parameters(), lr=LEARNING_RATE)
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    dl_train = torch.utils.data.DataLoader(ds_train, batch_size=BATCH_SIZE)
+    dl_train = torch.utils.data.DataLoader(ds_train, batch_size=BATCH_SIZE, shuffle=True)
     dl_valid = torch.utils.data.DataLoader(ds_valid, batch_size=BATCH_SIZE)
 
     last_epoch_improved = 0

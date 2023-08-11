@@ -11,3 +11,7 @@ xgboost
 s3fs
 streamlit
 plotly
+statsmodels
+PyQt5
+smtplib
+cuda-python
