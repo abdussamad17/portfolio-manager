@@ -14,3 +14,4 @@ plotly
 statsmodels
 PyQt5
 cuda-python
+gurobipy
