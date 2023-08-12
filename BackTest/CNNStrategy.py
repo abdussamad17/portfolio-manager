@@ -14,7 +14,11 @@ class CNNStrategy:
 
     def get_cached_or_train(self, date, price_history):
         model_hash = get_hash()
-        file_name = f'models/StockCNN_{model_hash}_{date}.pt'
+        models_dir = 'models'
+        file_name = f'{models_dir}/StockCNN_{model_hash}_{date}.pt'
+
+        if not os.path.exists(models_dir):
+            os.makedirs(models_dir)
 
         if not os.path.isfile(file_name):
             self.train(price_history)
