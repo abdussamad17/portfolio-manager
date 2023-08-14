@@ -1,12 +1,24 @@
 import numpy as np
 import xgboost as xgb
 import torch
+import collections
 
 class XGBStrategy:
     def __init__(self, retrain_every=252, regression=True):
         self._retrain_every = retrain_every
         self._trained = False
         self._regression = regression
+        self._past_prices = collections.deque()
+        self._past_preds = collections.deque()
+
+        self._correct_preds = 0
+        self._total_preds = 0
+        self._total_positive_moves = 0
+
+        self._ss_res = 0
+        self._ss_targets = 0
+
+        self.additional_information = {}
 
     #def get_dollar_weights(self, backtester, adj_universe, price_by_ticker):
     #    if (backtester.n_day + 1) % self._retrain_every == 0:
@@ -30,6 +42,26 @@ class XGBStrategy:
             return {ticker: 0 for ticker in adj_universe}
 
         preds = self.infer(adj_universe, backtester.price_history)
+        self._past_preds.appendleft(dict(preds.items()))
+
+        self._past_prices.appendleft(dict(price_by_ticker.items()))
+        predicteds = []
+        actuals = []
+
+        if len(self._past_preds) > 5:
+            for k, p in price_by_ticker.items():
+                if k in self._past_preds[-1] and k in self._past_prices[-1]:
+                    #print(self._past_prices[-1][k]['adjClose'], p['adjClose'])
+                    actual_ret = (self._past_prices[-1][k]['adjClose'] - p['adjClose']) / self._past_prices[-1][k]['adjClose']
+                    pred_ret = self._past_preds[-1][k]
+                    predicteds.append(pred_ret)
+                    actuals.append(actual_ret)
+
+            self._past_preds.pop()
+            self._past_prices.pop()
+
+        actuals = np.array(actuals, dtype=np.float64)
+        predicteds = np.array(predicteds, dtype=np.float64)
 
         if self._regression:
             pos_weights = {k: max(v, 0) for k, v in preds.items() if v > 0}  # using max to ensure no negative values
@@ -37,12 +69,25 @@ class XGBStrategy:
             if total_weight == 0:
                 return {ticker: 0 for ticker in adj_universe}
             normalized_weights = {ticker: weight/total_weight for ticker, weight in pos_weights.items()}
+
+            if actuals.size > 0:
+                self._ss_res += ((actuals - predicteds)**2).sum()
+                self._ss_targets += (actuals**2).sum()
+                rsq = 1 - self._ss_res/self._ss_targets
+                self.additional_information['rsq'] = rsq
         else:
             pred_values = list(preds.items())
             pred_values.sort(key=lambda x: x[1], reverse=True)
             weights = {k: 1 for k, v in pred_values[:len(pred_values)//10]}
             total_weight = sum(weights.values())
             normalized_weights = {ticker: weight/total_weight for ticker, weight in weights.items()}
+
+            if actuals.size > 0:
+                self._total_positive_moves += np.sum(actuals > 0)
+                self._correct_preds += ((actuals > 0) == (predicteds > 0.5)).sum()
+                self._total_preds += actuals.shape[0]
+                self.additional_information['pos_ratio'] = self._total_positive_moves / self._total_preds
+                self.additional_information['accuracy'] = self._correct_preds / self._total_preds
 
         return {ticker: normalized_weights.get(ticker, 0) for ticker in adj_universe}
 

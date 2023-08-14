@@ -56,7 +56,7 @@ python ../run_notification.py "starting XGBStrategy,regression=False and True"
 ## - XGBStrategy-regression=False,regression=True
 
 python Testback.py XGBStrategy,regression=False &
-python Testback.py XGBStrategy,regression=True&
+python Testback.py XGBStrategy,regression=True &
 
 wait
 

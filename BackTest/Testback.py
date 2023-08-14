@@ -165,7 +165,8 @@ class Backtester:
         self.portfolio_value = 0
         self.cash = 1000000
         self.date = datetime.date(1997, 6, 17)
-        self.end_date = datetime.date.today() #datetime.date(2009, 6, 17)
+        #self.end_date = datetime.date.today() #datetime.date(2009, 6, 17)
+        self.end_date = datetime.date(2002, 6, 17)
         self.daily_returns = []
         self.equity_curve = []
         self.universe = None
@@ -265,6 +266,10 @@ class Backtester:
                 self.volatility[ticker] = 0.02**2
 
         dollar_weights = self.strategy.get_dollar_weights(self, adj_universe, price_by_ticker)
+        additional_information = {}
+        if getattr(self.strategy, 'additional_information'):
+            additional_information = self.strategy.additional_information
+
         self.price_history.add_prices(self.date, price_by_ticker)
         ## Enforce the maximum position constraint
         #total_weight = sum(dollar_weights.values())
@@ -356,6 +361,7 @@ class Backtester:
             'adj_uni_size': len(adj_universe),
             'portfolio': dict({k: v for k, v in portfolio_values_by_ticker.items() if v > 0}),
         }
+        snap.update(additional_information)
         self.snapshots.append(snap)
         #print(self.date, self.universe_date)
         #print([k for k in self.universe if k not in price_by_ticker])

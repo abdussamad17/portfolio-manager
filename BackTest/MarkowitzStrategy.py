@@ -1,6 +1,38 @@
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
+import time
+
+def solve_qp(cov_matrix, return_vector=None, risk_constant=None, max_concentration=1, rec_counter=0):
+    SCALE = 1000
+
+    with gp.Env(empty=True) as env:
+        env.setParam('OutputFlag', 0)
+        env.start()
+
+        with gp.Model(env=env) as m:
+            w = m.addMVar(shape=cov_matrix.shape[0], lb=0, ub=max_concentration * SCALE, vtype=GRB.CONTINUOUS, name="w")
+            if return_vector is not None:
+                m.setObjective(w @ return_vector - risk_constant * w @ cov_matrix @ w, GRB.MAXIMIZE)
+            else:
+                m.setObjective(w @ cov_matrix @ w, GRB.MINIMIZE)
+            m.addConstr(w.sum() == SCALE)
+            try:
+                m.optimize()
+                # print(m.ObjVal)
+            except gp.GurobiError as e:
+                if rec_counter == 0:
+                    name = f'numerical_{int(time.time())}_'
+                    if return_vector is not None:
+                        np.save(name + 'returns.npy', return_vector)
+                    np.save(name + '_cov.npy', cov_matrix)
+                if rec_counter == 3:
+                    raise e
+                print('Warn: Numerical issues, attempting to shrink cov matrix.')
+                return solve_qp(cov_matrix + 5e-6 * np.eye(cov_matrix.shape[0]), return_vector, risk_constant, rec_counter=rec_counter+1)
+
+            # Map optimal weights to tickers
+            return w.X / SCALE
 
 class MarkowitzStrategy:
     def __init__(self, risk_constant, return_estimate, vol_weighted, max_concentration):
@@ -50,20 +82,9 @@ class MarkowitzStrategy:
         u, s, v = np.linalg.svd(cov_matrix)
         s[s < 1e-5] = 0
         cov_matrix = u @ np.diag(s) @ v
-
-        with gp.Env(empty=True) as env:
-            env.setParam('OutputFlag', 0)
-            env.start()
-
-            with gp.Model(env=env) as m:
-                w = m.addMVar(shape=num_assets, lb=0, ub=self._max_concentration * 1000, vtype=GRB.CONTINUOUS, name="w")
-                m.setObjective(w @ return_vector - self._risk_constant * w @ cov_matrix @ w, GRB.MAXIMIZE)
-                m.addConstr(w.sum() == 1000)
-                m.optimize()
-                # print(m.ObjVal)
-                # Map optimal weights to tickers
-                optimal_weights = {ticker: weight/1000.0 for ticker, weight in zip(adj_universe, w.X)}
-                return optimal_weights
+        weights = solve_qp(cov_matrix, return_vector, self._risk_constant, self._max_concentration)
+        optimal_weights = {ticker: weight for ticker, weight in zip(adj_universe, weights)}
+        return optimal_weights
 
 class MinimumVarianceStrategy:
     def __init__(self):
@@ -101,17 +122,6 @@ class MinimumVarianceStrategy:
         u, s, v = np.linalg.svd(cov_matrix)
         s[s < 1e-5] = 0
         cov_matrix = u @ np.diag(s) @ v
-
-        with gp.Env(empty=True) as env:
-            env.setParam('OutputFlag', 0)
-            env.start()
-
-            with gp.Model(env=env) as m:
-                w = m.addMVar(shape=num_assets, lb=0, vtype=GRB.CONTINUOUS, name="w")
-                m.setObjective(w @ cov_matrix @ w, GRB.MINIMIZE)
-                m.addConstr(w.sum() == 1)
-                m.optimize()
-                # print(m.ObjVal)
-                # Map optimal weights to tickers
-                optimal_weights = {ticker: weight for ticker, weight in zip(adj_universe, w.X)}
-                return optimal_weights
+        weights = solve_qp(cov_matrix)
+        optimal_weights = {ticker: weight for ticker, weight in zip(adj_universe, weights)}
+        return optimal_weights

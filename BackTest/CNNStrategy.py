@@ -2,6 +2,8 @@ import os
 
 import numpy as np
 import torch
+import collections
+
 from scipy.special import expit
 from CNNModel import make_image, train_model, get_hash
 
@@ -11,6 +13,14 @@ class CNNStrategy:
         self._retrain_every = retrain_every
         self._trained = False
         self._strategy_type = strategy_type
+
+        self._past_prices = collections.deque()
+        self._past_preds = collections.deque()
+
+        self._correct_preds = 0
+        self._total_preds = 0
+        self._total_positive_moves = 0
+        self.additional_information = {}
 
     def get_cached_or_train(self, date, price_history):
         model_hash = get_hash()
@@ -34,6 +44,8 @@ class CNNStrategy:
         if (backtester.n_day + 1) % self._retrain_every == 0:
             self.get_cached_or_train(backtester.date, backtester.price_history)
 
+        self._past_prices.appendleft(dict(price_by_ticker.items()))
+
         if not self._trained:
             return {ticker: 0 for ticker in adj_universe}
         else:
@@ -56,6 +68,40 @@ class CNNStrategy:
         with torch.inference_mode():
             self._model.eval()
             y_hats = self._model(xs_pt).cpu().numpy()
+
+
+        y_argmaxes = np.argmax(y_hats, axis=-1)
+
+        cur_preds = {}
+        for i, (t, v) in enumerate(fix_id_by_adj_universe.items()):
+            cur_preds[t] = y_argmaxes[i]
+        self._past_preds.appendleft(cur_preds)
+
+        predicteds = []
+        actuals = []
+
+        if len(self._past_preds) > 5:
+            for k, p in self._past_prices[0].items():
+                if k in self._past_preds[-1] and k in self._past_prices[-1]:
+                    #print(self._past_prices[-1][k]['adjClose'], p['adjClose'])
+                    actual_ret = (self._past_prices[-1][k]['adjClose'] - p['adjClose']) / self._past_prices[-1][k]['adjClose']
+                    pred_ret = self._past_preds[-1][k]
+                    predicteds.append(pred_ret)
+                    actuals.append(actual_ret)
+
+            self._past_preds.pop()
+            self._past_prices.pop()
+
+        actuals = np.array(actuals, dtype=np.float64)
+        predicteds = np.array(predicteds, dtype=np.float64)
+
+        if actuals.size > 0:
+            self._total_positive_moves += np.sum(actuals > 0)
+            self._correct_preds += ((actuals > 0) == (predicteds == 1)).sum()
+            self._total_preds += actuals.shape[0]
+            self.additional_information['pos_ratio'] = self._total_positive_moves / self._total_preds
+            self.additional_information['accuracy'] = self._correct_preds / self._total_preds
+
 
         if self._strategy_type == "equalpositive":
 
