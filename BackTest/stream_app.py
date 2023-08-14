@@ -62,7 +62,7 @@ def setup_strategy(strategy_choice, i):
         full_strategy += f",linkage_method={str(linkage_method)}"
     elif strategy_choice == "CNNStrategy":
         # Setup specific parameters for CNNStrategy
-        strategy_types = ["marketindicator", "equalpercent", "sigmoid"]
+        strategy_types = ["marketindicator", "equalpercent", "sigmoid","equalpositive"]
         strategy_type_choice = st.sidebar.selectbox(f"Select Strategy Type for Strategy {i+1}", strategy_types)
         full_strategy += f",strategy_type={str(strategy_type_choice)}"
     elif strategy_choice == "XGBStrategy":
@@ -187,7 +187,7 @@ class Model:
             json_file_name = f"{full_strategy}.json"
             json_data = load_json_data(json_file_name)
             json_data_list.append(json_data)
-            strategy_names.append(strategy_choice)
+            strategy_names.append(full_strategy)
 
         return json_data_list, strategy_names
 
