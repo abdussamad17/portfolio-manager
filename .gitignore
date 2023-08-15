@@ -16,3 +16,4 @@ BackTest/inputs.npz
 BackTest/inputs.npz.x
 BackTest/models
 BackTest/traincache
+*.npy

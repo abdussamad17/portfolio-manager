@@ -3,19 +3,19 @@ cd /home/user/github/portfolio-manager
 
 python run_notification.py "The script has begun"
 # Download all the files
-echo "Running data_fetch.py"
-python DataAcquisition/data_fetch.py
-
-# Generate extracts
-echo "Generate extracts"
-## - UniverseConstructor
-echo "Running UniverseConstructor.py"
-python DataAcquisition/UniverseConstructor.py
-## - ExtractDailyPrice
-echo "Running ExtractDailyPrice.py"
-python DataAcquisition/ExtractDailyPrice.py
-
-python run_notification.py "Data Extraction Complete"
+#echo "Running data_fetch.py"
+#python DataAcquisition/data_fetch.py
+#
+## Generate extracts
+#echo "Generate extracts"
+### - UniverseConstructor
+#echo "Running UniverseConstructor.py"
+#python DataAcquisition/UniverseConstructor.py
+### - ExtractDailyPrice
+#echo "Running ExtractDailyPrice.py"
+#python DataAcquisition/ExtractDailyPrice.py
+#
+#python run_notification.py "Data Extraction Complete"
 
 cd /home/user/github/portfolio-manager/BackTest
 

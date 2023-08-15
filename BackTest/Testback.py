@@ -166,7 +166,7 @@ class Backtester:
         self.cash = 1000000
         self.date = datetime.date(1997, 6, 17)
         #self.end_date = datetime.date.today() #datetime.date(2009, 6, 17)
-        self.end_date = datetime.date(2002, 6, 17)
+        self.end_date = datetime.date(2023, 8, 13)
         self.daily_returns = []
         self.equity_curve = []
         self.universe = None
@@ -267,7 +267,7 @@ class Backtester:
 
         dollar_weights = self.strategy.get_dollar_weights(self, adj_universe, price_by_ticker)
         additional_information = {}
-        if getattr(self.strategy, 'additional_information'):
+        if getattr(self.strategy, 'additional_information', None):
             additional_information = self.strategy.additional_information
 
         self.price_history.add_prices(self.date, price_by_ticker)
