@@ -69,6 +69,11 @@ def setup_strategy(strategy_choice, i):
         # Setup specific parameters for XGBStrategy
         regression = st.sidebar.checkbox(f"Regression for strat {i+1}?")
         full_strategy += f",regression={str(regression)}"
+
+    elif strategy_choice == "SPY-Index":
+
+        full_strategy = strategy_choice
+
     return full_strategy
 
 def display_json_data(json_data_list, strategy_names):
@@ -176,7 +181,7 @@ class Model:
 
 
     def load_backtest_data(self):
-        strategies = ["EqualDollarStrategy", "EqualVolStrategy", "MinimumVarianceStrategy", "EqualVolContributionStrategy", "MarkowitzStrategy", "HRPStrategy", "XGBStrategy", "CNNStrategy"]
+        strategies = ["EqualDollarStrategy", "EqualVolStrategy", "MinimumVarianceStrategy", "EqualVolContributionStrategy", "MarkowitzStrategy", "HRPStrategy", "XGBStrategy", "CNNStrategy","SPY-Index"]
         number_of_strategies = st.sidebar.slider("Number of strategies to compare", 1, len(strategies))
         json_data_list = []
         strategy_names = []
