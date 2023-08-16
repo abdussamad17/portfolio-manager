@@ -83,7 +83,7 @@ def display_json_data(json_data_list, strategy_names):
         df['date'] = pd.to_datetime(df['date'])
         metrics_fig.add_trace(go.Scatter(x=df['date'], y=df['roll_sr'], mode='lines', name=f'{strategy_name} - Rolling Sharpe'))
     metrics_fig.update_layout(title="Portfolio Metrics Over Time", xaxis_title="Date", width=GRAPH_WIDTH, height=GRAPH_HEIGHT,
-                              legend=dict(x=0, y=0, traceorder="normal", font=dict(family="sans-serif", size=12, color="white")))
+                              legend=dict(x=0, y=0, traceorder="normal", font=dict(family="sans-serif", size=12, color="black")))
     st.plotly_chart(metrics_fig)
 
     selected_date = st.date_input("Choose a date to view portfolio constituents", value=pd.to_datetime(json_data_list[0][0]['date']),
@@ -98,7 +98,7 @@ def display_json_data(json_data_list, strategy_names):
         portfolio_df['Strategy'] = strategy_name
         constituents_fig.add_trace(go.Scatter(x=portfolio_df['Asset'], y=portfolio_df['Value'], mode='markers', marker=dict(size=portfolio_df['Weight'], sizemode='diameter'),
                                               text=portfolio_df['Asset'], name=strategy_name))
-    constituents_fig.update_layout(legend=dict(x=0, y=0, traceorder="normal", font=dict(family="sans-serif", size=12, color="white")), title="Portfolio Constituents", xaxis_title="Asset", yaxis_title="Value", showlegend=True, width=1000, height=600)
+    constituents_fig.update_layout(legend=dict(x=0, y=0, traceorder="normal", font=dict(family="sans-serif", size=12, color="black")), title="Portfolio Constituents", xaxis_title="Asset", yaxis_title="Value", showlegend=True, width=1000, height=600)
     constituents_fig.update_traces(textposition='top center')
     st.plotly_chart(constituents_fig)
 
@@ -147,7 +147,7 @@ class EquityCurvesView:
             portfolio_values = [np.log10(snap['pv']) for snap in json_data]
             fig.add_trace(go.Scatter(x=dates, y=portfolio_values, mode='lines', name=strategy_name))
         fig.update_layout(
-            legend=dict(x=0, y=0, traceorder="normal", font=dict(family="sans-serif", size=12, color="white")),
+            legend=dict(x=0, y=0, traceorder="normal", font=dict(family="sans-serif", size=12, color="black"),bgcolor="rgba(255,255,255,0.5)"),
             title="Equity Curve", xaxis_title="Date", yaxis_title="Portfolio Value", legend_title="Strategies", autosize=False,
             width=GRAPH_WIDTH, height=GRAPH_HEIGHT, margin=dict(l=50, r=50, b=100, t=100, pad=4))
         st.plotly_chart(fig)
