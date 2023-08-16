@@ -110,7 +110,7 @@ def plot_equity_curve(backtester, fig=None):
         fig = go.Figure()
     fig.add_trace(go.Scatter(x=dates, y=portfolio_values, mode='lines', name=backtester.strategy_name))
     fig.update_layout(
-        legend=dict(x=0, y=0, traceorder="normal", font=dict(family="sans-serif", size=12, color="white")),
+        legend=dict(x=0, y=0, traceorder="normal", font=dict(family="sans-serif", size=12),bgcolor="rgba(255,255,255,0.5)"),
         title="Equity Curve", xaxis_title="Date", yaxis_title="Portfolio Value", legend_title="Strategies", autosize=False,
         width=GRAPH_WIDTH, height=GRAPH_HEIGHT, margin=dict(l=50, r=50, b=100, t=100, pad=4))
     return fig
