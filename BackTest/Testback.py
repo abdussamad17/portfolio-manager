@@ -505,6 +505,7 @@ if __name__ == '__main__':
         params['strategy_type'] = str(params['strategy_type'])
     elif sp[0] == 'XGBStrategy':
         params['regression'] = params['regression'] != 'False'
+        params['negative'] = params['negative'] != 'False'
 
     strat_class = strategy_by_name[sp[0]]
 

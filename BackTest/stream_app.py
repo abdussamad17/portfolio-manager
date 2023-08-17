@@ -68,7 +68,8 @@ def setup_strategy(strategy_choice, i):
     elif strategy_choice == "XGBStrategy":
         # Setup specific parameters for XGBStrategy
         regression = st.sidebar.checkbox(f"Regression for strat {i+1}?")
-        full_strategy += f",regression={str(regression)}"
+        Negative = st.sidebar.checkbox(f"Negative Weights {i+1}?")
+        full_strategy += f",regression={str(regression)},negative={str(Negative)}"
 
     elif strategy_choice == "SPY-Index":
 

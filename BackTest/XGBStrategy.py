@@ -4,10 +4,11 @@ import torch
 import collections
 
 class XGBStrategy:
-    def __init__(self, retrain_every=252, regression=True):
+    def __init__(self, retrain_every=252, regression=True,negative=False):
         self._retrain_every = retrain_every
         self._trained = False
         self._regression = regression
+        self._negative = negative
         self._past_prices = collections.deque()
         self._past_preds = collections.deque()
 
@@ -64,11 +65,18 @@ class XGBStrategy:
         predicteds = np.array(predicteds, dtype=np.float64)
 
         if self._regression:
-            pos_weights = {k: max(v, 0) for k, v in preds.items() if v > 0}  # using max to ensure no negative values
-            total_weight = sum(pos_weights.values())
-            if total_weight == 0:
-                return {ticker: 0 for ticker in adj_universe}
-            normalized_weights = {ticker: weight/total_weight for ticker, weight in pos_weights.items()}
+            if self._negative:
+                neg_weights = {k: min(v, 0) for k, v in preds.items() if v < 0}
+                total_weight = sum(abs(v) for v in neg_weights.values())
+                if total_weight == 0:
+                    return {ticker: 0 for ticker in adj_universe}
+                normalized_weights = {ticker: weight/total_weight for ticker, weight in neg_weights.items()}
+            else:
+                pos_weights = {k: max(v, 0) for k, v in preds.items() if v > 0}
+                total_weight = sum(pos_weights.values())
+                if total_weight == 0:
+                    return {ticker: 0 for ticker in adj_universe}
+                normalized_weights = {ticker: weight/total_weight for ticker, weight in pos_weights.items()}
 
             if actuals.size > 0:
                 self._ss_res += ((actuals - predicteds)**2).sum()
