@@ -3,7 +3,7 @@ import torch
 import hashlib
 import os
 
-
+#extracted from https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
 def bresenham(img, x0, y0, x1, y1):
     dx = abs(x1 - x0)
     sx = 1 if x0 < x1 else -1
