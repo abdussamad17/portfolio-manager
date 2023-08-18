@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+
 class SimpleBandit:
     def __init__(self, n_levers):
         self.n_levers = n_levers
@@ -12,4 +13,6 @@ class SimpleBandit:
     def pull(self, lever):
         return self.rewards[lever]
 
+
 def bandit_run(bandit, agent):
+    return bandit

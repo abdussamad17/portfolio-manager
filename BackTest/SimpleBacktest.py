@@ -12,7 +12,6 @@ import datetime
 
 
 class SimpleBacktest:
-
     def __init__(self):
         self.portfolio = {}
         self.portfolio_value_by_ticker = {}
@@ -29,8 +28,8 @@ class SimpleBacktest:
 
     def _try_get_universe_by_date(self, date):
         filepath = os.path.join(
-            '/Users/abdussamad/Documents/Github repos/portfolio-manager/RawDataStorage/UniversebyDate',
-            f'universe{date.strftime("%Y-%m-%d")}.json'
+            "/Users/abdussamad/Documents/Github repos/portfolio-manager/RawDataStorage/UniversebyDate",
+            f'universe{date.strftime("%Y-%m-%d")}.json',
         )
         if not os.path.exists(filepath):
             return None
@@ -39,8 +38,8 @@ class SimpleBacktest:
 
     def _try_get_prices_by_date(self, date):
         filepath = os.path.join(
-            '/Users/abdussamad/Documents/Github repos/portfolio-manager/DataExtracts',
-            f'daily_{date.strftime("%Y-%m-%d")}.json'
+            "/Users/abdussamad/Documents/Github repos/portfolio-manager/DataExtracts",
+            f'daily_{date.strftime("%Y-%m-%d")}.json',
         )
 
         if not os.path.exists(filepath):
@@ -51,7 +50,6 @@ class SimpleBacktest:
             for l in f:
                 res.append(json.loads(l.strip()))
         return res
-
 
     def _run_day(self):
         universe = self._try_get_universe_by_date(self.date)
@@ -64,29 +62,38 @@ class SimpleBacktest:
             return
 
         for x in prices:
-            self.last_seen_by_ticker[x['ticker']] = self.n_day
+            self.last_seen_by_ticker[x["ticker"]] = self.n_day
         self.n_day += 1
-        price_by_ticker = {x['ticker']: x for x in prices}
-        #print(f'{price_by_ticker=}')
-        adj_universe = {x for x in self.universe if self.n_day - self.last_seen_by_ticker.get(x, 0) < 20}
+        price_by_ticker = {x["ticker"]: x for x in prices}
+        # print(f'{price_by_ticker=}')
+        adj_universe = {
+            x
+            for x in self.universe
+            if self.n_day - self.last_seen_by_ticker.get(x, 0) < 20
+        }
 
-
-        dollar_weights = {ticker: 1/len(adj_universe) for ticker in adj_universe}
+        dollar_weights = {ticker: 1 / len(adj_universe) for ticker in adj_universe}
         portfolio_values_by_ticker = {}
 
-        uni_plus_holdings = set(self.universe).union(set([k for k, v in self.portfolio.items() if v > 0]))
+        uni_plus_holdings = set(self.universe).union(
+            set([k for k, v in self.portfolio.items() if v > 0])
+        )
         for ticker in uni_plus_holdings:
             if ticker in price_by_ticker:
                 pbt = price_by_ticker[ticker]
-                adj_open = pbt['open'] * pbt['adjClose'] / pbt['close']
-                portfolio_values_by_ticker[ticker] = self.portfolio.get(ticker, 0) * adj_open
+                adj_open = pbt["open"] * pbt["adjClose"] / pbt["close"]
+                portfolio_values_by_ticker[ticker] = (
+                    self.portfolio.get(ticker, 0) * adj_open
+                )
             else:
-                portfolio_values_by_ticker[ticker] = self.portfolio_value_by_ticker.get(ticker, 0)
+                portfolio_values_by_ticker[ticker] = self.portfolio_value_by_ticker.get(
+                    ticker, 0
+                )
 
-        #print(f'{portfolio_values_by_ticker=}')
+        # print(f'{portfolio_values_by_ticker=}')
 
         portfolio_value = sum(portfolio_values_by_ticker.values()) + self.cash
-        #print(f'{portfolio_value=}')
+        # print(f'{portfolio_value=}')
 
         target_positions = {}
         for ticker in uni_plus_holdings:
@@ -95,7 +102,7 @@ class SimpleBacktest:
                     target_positions[ticker] = portfolio_value * dollar_weights[ticker]
                 else:
                     target_positions[ticker] = 0
-        #print(f'{target_positions=}')
+        # print(f'{target_positions=}')
 
         turnover = 0
 
@@ -103,52 +110,48 @@ class SimpleBacktest:
             for ticker, tpos in target_positions.items():
                 delta_usd = tpos - portfolio_values_by_ticker[ticker]
                 pbt = price_by_ticker[ticker]
-                fill_price = pbt['vwap'] * pbt['adjClose'] / pbt['close']
+                fill_price = pbt["vwap"] * pbt["adjClose"] / pbt["close"]
                 delta_shares = delta_usd / fill_price
 
                 self.portfolio[ticker] = self.portfolio.get(ticker, 0) + delta_shares
                 self.cash -= delta_usd
                 turnover += abs(delta_usd)
 
-        #print(f'{self.portfolio=}')
+        # print(f'{self.portfolio=}')
 
         cost = turnover * 0.001
 
         for ticker in uni_plus_holdings:
             if ticker in price_by_ticker:
                 pbt = price_by_ticker[ticker]
-                portfolio_values_by_ticker[ticker] = self.portfolio.get(ticker, 0) * pbt['adjClose']
+                portfolio_values_by_ticker[ticker] = (
+                    self.portfolio.get(ticker, 0) * pbt["adjClose"]
+                )
 
         portfolio_value = sum(portfolio_values_by_ticker.values()) + self.cash
         snap = {
-            'date': self.date.strftime('%Y-%m-%d'),
-            'pv': portfolio_value,
-            'cash': self.cash,
-            'turnover': turnover,
-            'cost': cost,
-            'n_stocks': len([x for x in self.portfolio.values() if x > 0]),
-            'portfolio': dict(self.portfolio),
+            "date": self.date.strftime("%Y-%m-%d"),
+            "pv": portfolio_value,
+            "cash": self.cash,
+            "turnover": turnover,
+            "cost": cost,
+            "n_stocks": len([x for x in self.portfolio.values() if x > 0]),
+            "portfolio": dict(self.portfolio),
         }
         self.snapshots.append(snap)
-        #print(self.date, len(self.universe), len([k for k in self.universe if k in price_by_ticker]))
+        # print(self.date, len(self.universe), len([k for k in self.universe if k in price_by_ticker]))
         print(self.date, self.universe_date)
         print([k for k in self.universe if k not in price_by_ticker])
-
-
-
-
-
 
     def run(self):
         while self.date <= self.end_date:
             self._run_day()
             self.date += datetime.timedelta(days=1)
 
-        with open(f'backtest.json', "w") as fo:
+        with open(f"backtest.json", "w") as fo:
             for snap in self.snapshots:
                 json.dump(snap, fo)
                 fo.write("\n")
-
 
     def _get_price(self, ticker, date):
         try:
@@ -157,24 +160,26 @@ class SimpleBacktest:
             return None
 
     def _get_weights(self):
-        return {ticker: 1/len(self.universe) for ticker in self.universe}
+        return {ticker: 1 / len(self.universe) for ticker in self.universe}
 
     def _get_portfolio_value(self):
         return self.portfolio_value + self.cash
 
     def _get_portfolio_weights(self):
-        return {ticker: self.portfolio[ticker]/self._get_portfolio_value() for ticker in self.portfolio}
+        return {
+            ticker: self.portfolio[ticker] / self._get_portfolio_value()
+            for ticker in self.portfolio
+        }
 
     def _get_portfolio_returns(self):
-        return self._get_portfolio_value()/self._get_portfolio_value() - 1
+        return self._get_portfolio_value() / self._get_portfolio_value() - 1
 
     def _get_cagr(self):
-        return self._get_portfolio_value()/self.cash - 1
+        return self._get_portfolio_value() / self.cash - 1
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     bt = SimpleBacktest()
-    #print(bt._try_get_universe_by_date(bt.date))
-    #print(bt._try_get_universe_by_date(bt.date + datetime.timedelta(days=1)))
+    # print(bt._try_get_universe_by_date(bt.date))
+    # print(bt._try_get_universe_by_date(bt.date + datetime.timedelta(days=1)))
     bt.run()
-
-

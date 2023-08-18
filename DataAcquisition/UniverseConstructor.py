@@ -8,6 +8,7 @@ import shutil
 
 EARLY_EXIT = True
 
+
 class UniverseConstructor:
     def __init__(self):
         self.storage_folder = os.path.join(
@@ -16,7 +17,6 @@ class UniverseConstructor:
         # Define the subfolder path
         self.subfolder_path = os.path.join(self.storage_folder, "UniversebyDate")
 
-        # If the subfolder already exists, delete it and all its contents
         if os.path.exists(self.subfolder_path):
             shutil.rmtree(self.subfolder_path)
 
@@ -44,7 +44,7 @@ class UniverseConstructor:
 
         filepath = os.path.join(self.subfolder_path, f"{filename}.json")
         with open(filepath, "w") as f:
-            # Modify the universe dictionary to convert datetime objects to string format
+            # Modifying the universe dictionary to convert datetime objects to string format
             data = list(data.keys())
             json.dump(data, f)
 
@@ -58,7 +58,7 @@ class UniverseConstructor:
             for c in constituents
             if c["dateFirstAdded"]
         }
-        # load thme constituent changes and ticker changes
+        # load the constituent changes and ticker changes
         constituent_changes = self._load_json("historical_constituents")
         ticker_changes = self._load_json("symbol_changes")
 
@@ -72,7 +72,6 @@ class UniverseConstructor:
 
         for change in ticker_changes:
             ticker_changes_by_date[self._get_date(change["date"])].append(change)
-
 
         while current_date >= min(
             min(self._get_date(change["date"]) for change in constituent_changes),

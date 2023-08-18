@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+
 class RLModel:
     def __init__(self):
         self._value_network = None
@@ -14,18 +15,18 @@ class RLModel:
             torch.nn.ReLU(),
             torch.nn.Linear(20, 20),
             torch.nn.ReLU(),
-            torch.nn.Linear(20, 20)
+            torch.nn.Linear(20, 20),
         ]
 
     def train(self, price_history):
         self._value_network = torch.nn.Sequential(self._get_backbone())
-        self._actor_network = torch.nn.Sequential(self._get_backbone() + [torch.nn.Sigmoid()])
-
+        self._actor_network = torch.nn.Sequential(
+            self._get_backbone() + [torch.nn.Sigmoid()]
+        )
 
     def outputs(self, price_history, adj_universe):
-        return {
-            t: 0 for t in adj_universe
-        }
+        return {t: 0 for t in adj_universe}
+
 
 class RLStrategy:
     def __init__(self, retrain_every=252):
@@ -41,6 +42,5 @@ class RLStrategy:
         else:
             return self._model.outputs(backtester.price_history, adj_universe)
 
-
     def train(self, price_history):
-
+        return price_history
