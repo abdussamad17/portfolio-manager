@@ -1,4 +1,4 @@
-# portfolio-manager
+# Robo-Advisor (portfolio-manager)
 The goal of this project is to build & compare portfolio construction and management using machine learning techniques. We compare the performance of the
 models across several error metrics. A total of 17 model variants were tested from 8 classes of models.
 
