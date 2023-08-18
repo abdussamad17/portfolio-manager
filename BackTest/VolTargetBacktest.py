@@ -21,8 +21,8 @@ class VolTargetBacktest:
         self.halflife = 20
         self.alpha = 1 - np.exp(np.log(0.5) / self.halflife)  # decay factor for EMA
         self.prev_close = {}
-        self.returns = {}  # stores the most recent return for each stock
-        self.volatility = {}  # stores the EMA of volatility for each stock
+        self.returns = {}
+        self.volatility = {}  # EMA of volatility for each stock
 
         # SR comp
         self.alpha_yearly = 1 - np.exp(np.log(0.5) / 256)  # decay factor for EMA

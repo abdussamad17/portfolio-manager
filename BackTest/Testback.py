@@ -434,7 +434,7 @@ class Backtester:
             for i in range(1, len(portfolio_values))
         ]
 
-        # 1. Calculate CAGR
+        # Calculate CAGR
         initial_value = portfolio_values[0]
         final_value = portfolio_values[-1]
 
@@ -446,7 +446,7 @@ class Backtester:
         ).days / 365.25
         cagr = (final_value / initial_value) ** (1 / num_years) - 1
 
-        # 2. Calculate Sharpe Ratio
+        # Calculate Sharpe Ratio
         average_return = np.mean(daily_returns) * 252
         volatility = np.std(daily_returns) * 252**0.5
         # Assuming risk-free rate to be 0

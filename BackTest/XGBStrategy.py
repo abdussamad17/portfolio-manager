@@ -22,19 +22,6 @@ class XGBStrategy:
 
         self.additional_information = {}
 
-    # def get_dollar_weights(self, backtester, adj_universe, price_by_ticker):
-    #    if (backtester.n_day + 1) % self._retrain_every == 0:
-    #        self.train(backtester.price_history)
-    #
-    #    if not self._trained:
-    #        return {ticker: 0 for ticker in adj_universe}
-    #    else:
-    #        preds = self.infer(adj_universe, backtester.price_history)
-    #        pos_weights = set(k for k, v in preds.items() if v > 0.01)
-    #        print(len(adj_universe), len(pos_weights))
-    #        if not pos_weights:
-    #            return {ticker: 0 for ticker in adj_universe}
-    #        return {ticker: 1/len(pos_weights) if ticker in pos_weights else 0 for ticker in adj_universe}
 
     def get_dollar_weights(self, backtester, adj_universe, price_by_ticker):
         if (backtester.n_day + 1) % self._retrain_every == 0:
